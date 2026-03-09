@@ -702,7 +702,7 @@ if [[ ! -f "$_ENV" ]]; then
     _BOT_IP=$(hostname -I | awk '{print $1}')
 
     # Use sed to patch the template values
-    sed -i "s|^SIP_SERVER=.*|SIP_SERVER=${_BOT_IP}|"                       "$_ENV"
+    sed -i "s|^SIP_LOCAL_IP=.*|SIP_LOCAL_IP=${_BOT_IP}|"                   "$_ENV"
     sed -i "s|^LLM_MODEL=.*|LLM_MODEL=${MODEL_DIR}/mimo|"                  "$_ENV"
     sed -i "s|^VLLM_API_URL=.*|VLLM_API_URL=http://127.0.0.1:8000|"       "$_ENV"
     sed -i "s|^STT_MODEL=.*|STT_MODEL=${MODEL_DIR}/parakeet|"              "$_ENV"
