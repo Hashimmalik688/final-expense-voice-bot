@@ -383,7 +383,8 @@ info "Installing bot application dependencies …"
     "pyVoIP>=1.6.8" \
     "aiohttp>=3.10.0" \
     "scikit-learn>=1.4.0" \
-    "uvicorn[standard]>=0.30.0"
+    "uvicorn[standard]>=0.30.0" \
+    "huggingface_hub[cli]>=0.23.0"
 
 ok "Bot venv ready: $VENV_BOT"
 
@@ -647,7 +648,6 @@ else
     HF_TOKEN_ENV=""
     if [[ -n "$HF_TOKEN" ]]; then
         HF_TOKEN_ENV="HF_TOKEN=${HF_TOKEN}"
-        "${VENV_BOT}/bin/pip" install -q huggingface_hub
         env HF_TOKEN="$HF_TOKEN" \
             "${VENV_BOT}/bin/huggingface-cli" login --token "$HF_TOKEN" --add-to-git-credential 2>/dev/null || true
     fi
