@@ -97,6 +97,11 @@ VENV_TTS="/opt/cosyvoice-env"
 LOG_DIR="/var/log/voicebot"
 PYTHON_BIN=""                            # resolved after Python install
 
+# ─── Detect whether systemd is usable (containers often lack it) ──────────────
+HAS_SYSTEMD=false
+if command -v systemctl &>/dev/null && systemctl is-system-running &>/dev/null 2>&1; then
+    HAS_SYSTEMD=true
+fi
 TORCH_CUDA_INDEX="https://download.pytorch.org/whl/cu121"
 VLLM_VERSION="0.6.6"
 NEMO_VERSION="2.1.0"
@@ -878,9 +883,14 @@ WantedBy=timers.target
 EOF
 
 # ─── Reload systemd and enable services ──────────────────────────────────────
-systemctl daemon-reload
-systemctl enable voicebot-vllm voicebot-tts voicebot voicebot-monitor.timer
-ok "Systemd units created and enabled"
+if [[ "$HAS_SYSTEMD" == true ]]; then
+    systemctl daemon-reload
+    systemctl enable voicebot-vllm voicebot-tts voicebot voicebot-monitor.timer
+    ok "Systemd units created and enabled"
+else
+    warn "systemd not available (container/Vast.ai) — systemd units written but not enabled"
+    info "Services will be started directly via shell commands instead"
+fi
 
 fi  # SKIP_SERVICES
 
@@ -892,14 +902,17 @@ section "STEP 11/11  Firewall"
 # Only configure ufw if it's available and not already active in a conflicting way
 if command -v ufw &>/dev/null; then
     # Allow SSH before enabling, to avoid locking ourselves out
-    ufw allow ssh                       > /dev/null 2>&1
-    ufw allow 5060/udp comment "SIP"    > /dev/null 2>&1
-    ufw allow 5060/tcp comment "SIP/TCP" > /dev/null 2>&1
-    ufw allow 9000/tcp comment "VoiceBot API" > /dev/null 2>&1
+    ufw allow ssh                       > /dev/null 2>&1 || true
+    ufw allow 5060/udp comment "SIP"    > /dev/null 2>&1 || true
+    ufw allow 5060/tcp comment "SIP/TCP" > /dev/null 2>&1 || true
+    ufw allow 9000/tcp comment "VoiceBot API" > /dev/null 2>&1 || true
     # Internal ports: vLLM (8000) and TTS (8001) bound to 127.0.0.1 — no ufw rule needed
-    ufw --force enable                  > /dev/null 2>&1
-    ok "ufw rules: SSH + 5060/udp + 5060/tcp + 9000/tcp"
-    ufw status numbered | head -20
+    if ufw --force enable > /dev/null 2>&1; then
+        ok "ufw rules: SSH + 5060/udp + 5060/tcp + 9000/tcp"
+        ufw status numbered | head -20
+    else
+        warn "ufw could not be enabled (likely container/Vast.ai) — ports are open by default"
+    fi
 else
     warn "ufw not found; configuring iptables directly …"
     iptables -I INPUT -p udp --dport 5060 -j ACCEPT -m comment --comment "SIP"
@@ -933,21 +946,93 @@ _wait_http() {
 }
 
 if [[ "$SKIP_SERVICES" != true ]]; then
-    # Start in dependency order
-    info "Starting voicebot-vllm …"
-    systemctl start voicebot-vllm
-    _wait_http "vLLM" "http://127.0.0.1:8000/health" 300
+    if [[ "$HAS_SYSTEMD" == true ]]; then
+        # ── systemd path ──────────────────────────────────────────────────────
+        info "Starting voicebot-vllm …"
+        systemctl start voicebot-vllm
+        _wait_http "vLLM" "http://127.0.0.1:8000/health" 300
 
-    info "Starting voicebot-tts …"
-    systemctl start voicebot-tts
-    _wait_http "CosyVoice TTS" "http://127.0.0.1:8001/health" 120
+        info "Starting voicebot-tts …"
+        systemctl start voicebot-tts
+        _wait_http "CosyVoice TTS" "http://127.0.0.1:8001/health" 120
 
-    info "Starting voicebot …"
-    systemctl start voicebot
-    _wait_http "Voice Bot API" "http://127.0.0.1:9000/health" 60
+        info "Starting voicebot …"
+        systemctl start voicebot
+        _wait_http "Voice Bot API" "http://127.0.0.1:9000/health" 60
 
-    info "Starting health monitor timer …"
-    systemctl start voicebot-monitor.timer
+        info "Starting health monitor timer …"
+        systemctl start voicebot-monitor.timer
+    else
+        # ── Container / no-systemd path ───────────────────────────────────────
+        # Write a helper start script that can be re-used manually
+        cat > "${DEPLOY_DIR}/scripts/start_all.sh" << 'STARTEOF'
+#!/usr/bin/env bash
+set -euo pipefail
+DEPLOY_DIR="/opt/voicebot"
+LOG_DIR="/var/log/voicebot"
+source "${DEPLOY_DIR}/.env" 2>/dev/null || true
+mkdir -p "$LOG_DIR"
+
+echo "[start_all] Starting vLLM …"
+nohup /opt/vllm-env/bin/python -m vllm.entrypoints.openai.api_server \
+    --model /opt/models/mimo \
+    --served-model-name MiMo-7B-RL \
+    --host 127.0.0.1 --port 8000 \
+    --dtype bfloat16 --gpu-memory-utilization 0.42 \
+    --max-model-len 8192 --max-num-seqs 30 \
+    --disable-log-requests --trust-remote-code \
+    > "${LOG_DIR}/vllm.log" 2>&1 &
+echo $! > /tmp/voicebot-vllm.pid
+
+echo "[start_all] Starting CosyVoice TTS …"
+export COSYVOICE_MODEL_DIR=/opt/models/cosyvoice
+export TTS_HOST=127.0.0.1 TTS_PORT=8001
+export PYTHONPATH="/opt/cosyvoice-src:/opt/cosyvoice-src/third_party/Matcha-TTS"
+nohup /opt/cosyvoice-env/bin/python "${DEPLOY_DIR}/scripts/cosyvoice_server.py" \
+    > "${LOG_DIR}/tts.log" 2>&1 &
+echo $! > /tmp/voicebot-tts.pid
+
+# Wait for vLLM + TTS to be ready
+for i in $(seq 1 60); do
+    curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1 && \
+    curl -sf http://127.0.0.1:8001/health >/dev/null 2>&1 && break
+    echo "  Waiting for vLLM + TTS ($i/60)…"; sleep 5
+done
+
+echo "[start_all] Starting Voice Bot …"
+export PYTHONPATH="${DEPLOY_DIR}"
+export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+nohup /opt/voicebot/.venv/bin/uvicorn src.main:app \
+    --host 0.0.0.0 --port 9000 --workers 1 \
+    --loop asyncio --log-level info --access-log \
+    > "${LOG_DIR}/voicebot.log" 2>&1 &
+echo $! > /tmp/voicebot-main.pid
+
+echo "[start_all] All services launched."
+echo "  PIDs: vllm=$(cat /tmp/voicebot-vllm.pid) tts=$(cat /tmp/voicebot-tts.pid) bot=$(cat /tmp/voicebot-main.pid)"
+STARTEOF
+        chmod +x "${DEPLOY_DIR}/scripts/start_all.sh"
+
+        # Also write a stop script
+        cat > "${DEPLOY_DIR}/scripts/stop_all.sh" << 'STOPEOF'
+#!/usr/bin/env bash
+for pf in /tmp/voicebot-vllm.pid /tmp/voicebot-tts.pid /tmp/voicebot-main.pid; do
+    [[ -f "$pf" ]] && kill "$(cat "$pf")" 2>/dev/null && rm -f "$pf" && echo "Stopped $(basename "$pf" .pid)"
+done
+STOPEOF
+        chmod +x "${DEPLOY_DIR}/scripts/stop_all.sh"
+        ok "Container launcher scripts written:"
+        info "  ${DEPLOY_DIR}/scripts/start_all.sh"
+        info "  ${DEPLOY_DIR}/scripts/stop_all.sh"
+
+        # Now actually start everything
+        info "Starting all services (no-systemd mode) …"
+        bash "${DEPLOY_DIR}/scripts/start_all.sh"
+
+        _wait_http "vLLM" "http://127.0.0.1:8000/health" 300
+        _wait_http "CosyVoice TTS" "http://127.0.0.1:8001/health" 120
+        _wait_http "Voice Bot API" "http://127.0.0.1:9000/health" 60
+    fi
 fi
 
 
@@ -978,12 +1063,28 @@ cat << INFO
   tail -f ${LOG_DIR}/voicebot.log
   tail -f ${LOG_DIR}/vllm.log
   tail -f ${LOG_DIR}/tts.log
+INFO
+
+if [[ "$HAS_SYSTEMD" == true ]]; then
+cat << INFO
   journalctl -u voicebot -f
 
   ── Service management ───────────────────────────────────────────────
   systemctl status voicebot voicebot-vllm voicebot-tts
   systemctl restart voicebot
   systemctl stop voicebot voicebot-vllm voicebot-tts
+INFO
+else
+cat << INFO
+
+  ── Service management (container mode) ──────────────────────────────
+  Start all : bash ${DEPLOY_DIR}/scripts/start_all.sh
+  Stop all  : bash ${DEPLOY_DIR}/scripts/stop_all.sh
+  Check PIDs: cat /tmp/voicebot-*.pid
+INFO
+fi
+
+cat << INFO
 
   ── Next steps ────────────────────────────────────────────────────────
   1. Edit ${DEPLOY_DIR}/.env — set VICIDIAL_* credentials and SIP_PASSWORD
