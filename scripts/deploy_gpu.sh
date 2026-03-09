@@ -389,7 +389,7 @@ info "Installing bot application dependencies …"
     "aiohttp>=3.10.0" \
     "scikit-learn>=1.4.0" \
     "uvicorn[standard]>=0.30.0" \
-    "huggingface_hub[cli]>=0.23.0,<1.0"
+    "huggingface_hub>=0.23.0"
 
 ok "Bot venv ready: $VENV_BOT"
 
@@ -650,12 +650,8 @@ if [[ "$SKIP_MODELS" == true ]]; then
     warn "SKIP_MODELS=true — skipping model downloads"
 else
     # Configure HuggingFace token if provided
-    # Resolve huggingface-cli: prefer the bin script, fall back to python -m
-    if [[ -x "${VENV_BOT}/bin/huggingface-cli" ]]; then
-        HF_CLI=("${VENV_BOT}/bin/huggingface-cli")
-    else
-        HF_CLI=("${VENV_BOT}/bin/python" -m huggingface_hub.commands.huggingface_cli)
-    fi
+    # Use python -m huggingface_hub as CLI (works on all hub versions)
+    HF_CLI=("${VENV_BOT}/bin/python" -m huggingface_hub)
     # Export HF_TOKEN so all child processes inherit it
     if [[ -n "$HF_TOKEN" ]]; then
         export HF_TOKEN
