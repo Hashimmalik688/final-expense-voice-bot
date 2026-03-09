@@ -660,9 +660,10 @@ else
     _hf_dl() { "${HF_CLI[@]}" download "$@"; }
 
     # ── Llama 3.1 8B Instruct ─────────────────────────────────────────────────
-    info "Downloading Llama-3.1-8B-Instruct (meta-llama/Llama-3.1-8B-Instruct) → ${MODEL_DIR}/llama"
+    # Using the unsloth mirror (ungated, identical weights to meta-llama gated repo)
+    info "Downloading Llama-3.1-8B-Instruct (unsloth/Meta-Llama-3.1-8B-Instruct) → ${MODEL_DIR}/llama"
     info "  This is ~16 GB — expect 5–20 minutes depending on bandwidth"
-    _hf_dl meta-llama/Llama-3.1-8B-Instruct \
+    _hf_dl unsloth/Meta-Llama-3.1-8B-Instruct \
         --local-dir "${MODEL_DIR}/llama" \
         --local-dir-use-symlinks False
     ok "Llama 3.1 8B Instruct downloaded"
