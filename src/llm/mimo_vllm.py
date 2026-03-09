@@ -1,9 +1,9 @@
 """
-Mimo v2 Flash LLM client served via vLLM.
+Llama 3.1 8B Instruct LLM client served via vLLM.
 
 Provides an async interface to the vLLM OpenAI-compatible API running the
-Mimo v2 Flash model.  Supports streaming token generation so the TTS engine
-can begin synthesising speech before the full response is ready.
+Llama-3.1-8B-Instruct model.  Supports streaming token generation so the TTS
+engine can begin synthesising speech before the full response is ready.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ class LLMResponse:
 
 
 class MimoVLLMClient:
-    """Async client for the Mimo model running on a vLLM server.
+    """Async vLLM client for Llama-3.1-8B-Instruct (name kept for import compatibility).
 
     The vLLM server exposes an **OpenAI-compatible** ``/v1/chat/completions``
     endpoint.  This client calls that endpoint with the system prompt,
@@ -67,7 +67,7 @@ class MimoVLLMClient:
             timeout = aiohttp.ClientTimeout(total=self._config.timeout_s)
             self._session = aiohttp.ClientSession(timeout=timeout)
             logger.info(
-                "MimoVLLM client initialised – endpoint=%s  model=%s",
+                "LLM client initialised – endpoint=%s  model=%s",
                 self._base_url,
                 self._config.model_name,
             )
@@ -76,7 +76,7 @@ class MimoVLLMClient:
         """Close the HTTP session."""
         if self._session and not self._session.closed:
             await self._session.close()
-            logger.info("MimoVLLM client shut down.")
+            logger.info("LLM client shut down.")
 
     # ------------------------------------------------------------------
     # Health check
@@ -237,3 +237,7 @@ class MimoVLLMClient:
             result.finish_reason,
         )
         return result
+
+
+# Alias so code can use either name
+LlamaVLLMClient = MimoVLLMClient

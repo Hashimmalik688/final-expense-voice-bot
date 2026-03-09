@@ -20,7 +20,7 @@
 #   -y / --yes             Non-interactive; skip all prompts
 #
 # DISK REQUIREMENTS  (recommend at least 100 GB)
-#   Mimo v2 Flash 7B          ~15 GB
+#   Llama 3.1 8B Instruct     ~16 GB
 #   Parakeet TDT 0.6B          ~1.2 GB
 #   CosyVoice2 0.5B            ~1.0 GB
 #   sentence-transformers MiniLM ~0.1 GB
@@ -29,7 +29,7 @@
 #   Total                      ~47 GB
 #
 # GPU MEMORY BUDGET  (A100 40 GB)
-#   vLLM  — Mimo 7B (bfloat16)    ~16 GB   (gpu_memory_utilization=0.42)
+#   vLLM  — Llama-3.1-8B (bfloat16) ~16 GB (gpu_memory_utilization=0.42)
 #   CosyVoice 2 (0.5B)             ~2 GB
 #   Parakeet TDT (0.6B, in-proc)   ~2 GB
 #   CUDA context + overhead        ~2 GB
@@ -41,7 +41,7 @@
 #   ┌─────────────────────────────────────────────────────────────┐
 #   │  voicebot-vllm.service                                       │
 #   │  vLLM OpenAI-compatible server  localhost:8000               │
-#   │  Model: XiaomiMiMo/MiMo-7B-RL (Mimo v2 Flash)               │
+#   │  Model: meta-llama/Llama-3.1-8B-Instruct                      │
 #   └─────────────────────────────────────────────────────────────┘
 #
 #   ┌─────────────────────────────────────────────────────────────┐
@@ -329,7 +329,7 @@ section "STEP 5/11  Project sync + directories"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 mkdir -p "$DEPLOY_DIR" "$MODEL_DIR" "$LOG_DIR"
-mkdir -p "${MODEL_DIR}/mimo" "${MODEL_DIR}/parakeet" "${MODEL_DIR}/cosyvoice" "${MODEL_DIR}/minilm"
+mkdir -p "${MODEL_DIR}/llama" "${MODEL_DIR}/parakeet" "${MODEL_DIR}/cosyvoice" "${MODEL_DIR}/minilm"
 
 # Sync source code to deploy directory (preserves git history if src is a repo)
 info "Syncing project: $PROJECT_SRC → $DEPLOY_DIR"
@@ -659,13 +659,13 @@ else
     fi
     _hf_dl() { "${HF_CLI[@]}" download "$@"; }
 
-    # ── Mimo v2 Flash (7B) ────────────────────────────────────────────────────
-    info "Downloading Mimo v2 Flash (XiaomiMiMo/MiMo-7B-RL) → ${MODEL_DIR}/mimo"
-    info "  This is ~15 GB — expect 5–20 minutes depending on bandwidth"
-    _hf_dl XiaomiMiMo/MiMo-7B-RL \
-        --local-dir "${MODEL_DIR}/mimo" \
+    # ── Llama 3.1 8B Instruct ─────────────────────────────────────────────────
+    info "Downloading Llama-3.1-8B-Instruct (meta-llama/Llama-3.1-8B-Instruct) → ${MODEL_DIR}/llama"
+    info "  This is ~16 GB — expect 5–20 minutes depending on bandwidth"
+    _hf_dl meta-llama/Llama-3.1-8B-Instruct \
+        --local-dir "${MODEL_DIR}/llama" \
         --local-dir-use-symlinks False
-    ok "Mimo v2 Flash downloaded"
+    ok "Llama 3.1 8B Instruct downloaded"
 
     # ── Parakeet TDT 0.6B ─────────────────────────────────────────────────────
     info "Downloading Parakeet TDT (nvidia/parakeet-tdt-0.6b-v2) → ${MODEL_DIR}/parakeet"
@@ -704,7 +704,7 @@ if [[ ! -f "$_ENV" ]]; then
 
     # Use sed to patch the template values
     sed -i "s|^SIP_LOCAL_IP=.*|SIP_LOCAL_IP=${_BOT_IP}|"                   "$_ENV"
-    sed -i "s|^LLM_MODEL=.*|LLM_MODEL=${MODEL_DIR}/mimo|"                  "$_ENV"
+    sed -i "s|^LLM_MODEL=.*|LLM_MODEL=${MODEL_DIR}/llama|"                 "$_ENV"
     sed -i "s|^VLLM_API_URL=.*|VLLM_API_URL=http://127.0.0.1:8000|"       "$_ENV"
     sed -i "s|^STT_MODEL=.*|STT_MODEL=${MODEL_DIR}/parakeet|"              "$_ENV"
     sed -i "s|^TTS_API_URL=.*|TTS_API_URL=http://127.0.0.1:8001|"         "$_ENV"
@@ -731,7 +731,7 @@ else
 # ─── voicebot-vllm.service ────────────────────────────────────────────────────
 tee /etc/systemd/system/voicebot-vllm.service > /dev/null << EOF
 [Unit]
-Description=Voice Bot — vLLM OpenAI Server (Mimo v2 Flash)
+Description=Voice Bot — vLLM OpenAI Server (Llama 3.1 8B Instruct)
 Documentation=https://github.com/vllm-project/vllm
 After=network.target
 Wants=network-online.target
@@ -752,8 +752,8 @@ Environment=HF_DATASETS_OFFLINE=1
 #   Max model context: 8192 tokens (longer = more KV cache VRAM)
 #   max-num-seqs=30 → 30 concurrent call legs maximum
 ExecStart=${VENV_VLLM}/bin/python -m vllm.entrypoints.openai.api_server \
-    --model ${MODEL_DIR}/mimo \
-    --served-model-name MiMo-7B-RL \
+    --model ${MODEL_DIR}/llama \
+    --served-model-name Llama-3.1-8B-Instruct \
     --host 127.0.0.1 \
     --port 8000 \
     --dtype bfloat16 \

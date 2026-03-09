@@ -86,7 +86,7 @@ class STTConfig:
 
 @dataclass(frozen=True)
 class LLMConfig:
-    """Mimo v2 Flash LLM / vLLM settings."""
+    """Llama 3.1 8B Instruct / vLLM settings."""
 
     model_name: str = field(default_factory=lambda: _env("LLM_MODEL", "meta-llama/Llama-3.1-8B-Instruct"))
     vllm_api_url: str = field(default_factory=lambda: _env("VLLM_API_URL", "http://127.0.0.1:8000"))
