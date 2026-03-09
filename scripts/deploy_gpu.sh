@@ -106,6 +106,7 @@ SKIP_APT=false
 SKIP_CUDA=false
 SKIP_MODELS=false
 SKIP_SERVICES=false
+SKIP_TTS_VENV=false
 YES=false
 
 # ─── Argument parsing ─────────────────────────────────────────────────────────
@@ -115,11 +116,12 @@ while [[ $# -gt 0 ]]; do
         --project-dir)  PROJECT_SRC="$2";        shift 2 ;;
         --deploy-dir)   DEPLOY_DIR="$2";         shift 2 ;;
         --model-dir)    MODEL_DIR="$2";          shift 2 ;;
-        --skip-apt)     SKIP_APT=true;           shift   ;;
-        --skip-cuda)    SKIP_CUDA=true;          shift   ;;
-        --skip-models)  SKIP_MODELS=true;        shift   ;;
+        --skip-apt)      SKIP_APT=true;          shift   ;;
+        --skip-cuda)     SKIP_CUDA=true;         shift   ;;
+        --skip-models)   SKIP_MODELS=true;       shift   ;;
         --skip-services) SKIP_SERVICES=true;     shift   ;;
-        -y|--yes)       YES=true;                shift   ;;
+        --skip-tts-venv) SKIP_TTS_VENV=true;     shift   ;;
+        -y|--yes)        YES=true;               shift   ;;
         *) die "Unknown option: $1  (run with --help to see options)" ;;
     esac
 done
@@ -400,6 +402,9 @@ info "Installing vLLM ${VLLM_VERSION} …"
 ok "vLLM venv ready: $VENV_VLLM"
 
 # ─── 6c. CosyVoice venv ───────────────────────────────────────────────────────
+if [[ "$SKIP_TTS_VENV" == true ]]; then
+    warn "SKIP_TTS_VENV=true — skipping CosyVoice venv setup"
+else
 info "Cloning CosyVoice 2 source …"
 if [[ ! -d "$COSYVOICE_SRC/.git" ]]; then
     git clone --depth 1 https://github.com/FunAudioLLM/CosyVoice.git "$COSYVOICE_SRC"
@@ -426,12 +431,23 @@ info "Installing CosyVoice 2 dependencies …"
 # imports numpy at build time and will fail if it isn't present yet.
 "${VENV_TTS}/bin/pip" install -q "numpy==1.26.4"
 
+# tensorrt-cu12 packages use a stub build backend (wheel_stub.buildapi) that
+# pip cannot resolve from PyPI.  Install them up-front from NVIDIA's index,
+# falling back gracefully if unavailable (CosyVoice works without TensorRT;
+# it falls back to direct PyTorch inference).
+"${VENV_TTS}/bin/pip" install -q \
+    "tensorrt-cu12==10.13.3.9" \
+    "tensorrt-cu12-bindings==10.13.3.9" \
+    "tensorrt-cu12-libs==10.13.3.9" \
+    --extra-index-url https://pypi.nvidia.com \
+    || warn "tensorrt-cu12 unavailable — CosyVoice will use PyTorch inference fallback"
+
 # --no-build-isolation: uses the venv's already-installed setuptools/numpy so
 # that pkg_resources (openai-whisper) and numpy (pyworld) are visible to each
 # package's build backend subprocess.
-"${VENV_TTS}/bin/pip" install -q \
-    -r "${COSYVOICE_SRC}/requirements.txt" \
-    --no-build-isolation
+# Exclude tensorrt lines (already handled above) to avoid redundant failures.
+grep -v '^tensorrt' "${COSYVOICE_SRC}/requirements.txt" | \
+    "${VENV_TTS}/bin/pip" install -q -r /dev/stdin --no-build-isolation
 
 # CosyVoice has no setup.py / pyproject.toml → editable install is not
 # possible. Instead, drop a .pth file so the source tree is on sys.path.
@@ -446,6 +462,7 @@ info "CosyVoice source added to sys.path via ${SITE_PKGS}/cosyvoice-src.pth"
     "fastapi>=0.115.0" \
     "uvicorn[standard]>=0.30.0"
 ok "CosyVoice venv ready: $VENV_TTS"
+fi  # end SKIP_TTS_VENV
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
