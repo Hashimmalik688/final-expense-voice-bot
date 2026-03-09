@@ -1,0 +1,374 @@
+{
+  "_README": {
+    "purpose": "This file is the voice bot's product knowledge database. The bot searches it in real time to give accurate, consistent answers.",
+    "how_to_edit": [
+      "1. Find the section you want to update (product_info, pricing, etc.).",
+      "2. Change the text inside the quotes. Keep the quotes!",
+      "3. To add a new entry, copy an existing one and change the key name and text.",
+      "4. To add keywords, add comma-separated words in the 'keywords' array — these help the bot find the right answer faster.",
+      "5. Save the file, then call POST /reload/knowledge (or click 'Reload Knowledge Base' in the dashboard).",
+      "6. Use a JSON validator (jsonlint.com) if you're unsure your edits are valid.",
+      "IMPORTANT: Do NOT remove the 'keywords' arrays — the bot uses them to match questions to answers."
+    ]
+  },
+
+
+  "product_info": [
+    {
+      "key": "what_is_final_expense",
+      "question": "What is final expense insurance?",
+      "answer": "Final expense insurance — sometimes called burial insurance or funeral insurance — is a small whole life insurance policy designed specifically to cover your end-of-life costs. That includes the funeral service, burial or cremation, casket or urn, headstone, flowers, outstanding medical bills, credit card debt, and any other loose ends. Policies typically range from $5,000 to $25,000 in coverage. Unlike term life insurance, it never expires — it covers you for your entire life as long as you pay your premiums.",
+      "keywords": ["final expense", "what is", "definition", "explain", "burial insurance", "funeral insurance", "whole life"]
+    },
+    {
+      "key": "coverage_amounts",
+      "question": "How much coverage can I get?",
+      "answer": "Final expense policies typically range from $5,000 to $25,000, with some carriers offering up to $35,000 or $40,000. The most popular coverage amounts are $10,000, $15,000, and $20,000. The right amount depends on your situation — the average funeral in the U.S. costs between $7,848 (cremation with service) and $12,000–$15,000 (traditional burial with viewing and service). Many people also want extra to cover outstanding debts or leave a small cushion for their family.",
+      "keywords": ["coverage", "how much", "amount", "benefit", "face value", "policy size", "5000", "10000", "15000", "20000", "25000"]
+    },
+    {
+      "key": "age_requirements",
+      "question": "What ages qualify for final expense insurance?",
+      "answer": "Final expense insurance is designed for adults between 40 and 85 years old. This is the standard age range across most carriers. Some carriers accept applicants as young as 30 or as old as 89 depending on the plan type, but the sweet spot for the best rates and most options is 50 to 80. The younger you are when you apply, the lower your rate will be — and that rate locks in for life.",
+      "keywords": ["age", "qualify", "eligible", "how old", "years old", "40", "85", "requirements", "age limit"]
+    },
+    {
+      "key": "no_medical_exam",
+      "question": "Is a medical exam required?",
+      "answer": "No medical exam is required for any final expense insurance plan. The application is done entirely over the phone or online. For Preferred and Standard plans, you'll answer a short list of yes-or-no health questions — usually about 8 to 12 questions covering things like recent hospitalizations, cancer diagnosis, or organ disease. For Guaranteed Issue plans, there are zero health questions at all — you're automatically accepted if you're in the age range.",
+      "keywords": ["medical exam", "exam", "doctor", "physical", "no exam", "health questions", "application"]
+    },
+    {
+      "key": "guaranteed_acceptance",
+      "question": "What is guaranteed acceptance / guaranteed issue?",
+      "answer": "Guaranteed acceptance (also called guaranteed issue) is a type of final expense plan that accepts everyone regardless of health — no health questions, no medical exam, no rejections. If you're between 40 and 85, you're approved. The tradeoff is that guaranteed issue plans have a 2-to-3 year graded benefit period: if you pass away from natural causes in the first 2–3 years, your beneficiary receives a return of premiums paid plus interest (usually 10%) rather than the full death benefit. After that waiting period, the full benefit is in effect. Accidental death is covered in full from day one.",
+      "keywords": ["guaranteed acceptance", "guaranteed issue", "no questions", "auto approve", "graded", "waiting period", "everyone qualifies"]
+    },
+    {
+      "key": "whole_life_features",
+      "question": "Is final expense whole life or term life?",
+      "answer": "Final expense insurance is a permanent whole life policy — not term. That means it never expires, your premium never increases, and your death benefit never decreases. Term life insurance expires after a set period (10, 20, or 30 years) and has no cash value. Whole life also builds cash value over time that you can borrow against if needed. Once your final expense policy is in force, it's yours for life.",
+      "keywords": ["whole life", "term", "permanent", "expire", "type of insurance", "cash value"]
+    }
+  ],
+
+
+  "pricing": [
+    {
+      "key": "typical_monthly_cost",
+      "question": "How much does final expense insurance cost per month?",
+      "answer": "Monthly premiums vary by age, gender, health, and coverage amount. Here are rough averages for a $10,000 policy: Age 50 female $25–$35/month, age 50 male $30–$40/month. Age 60 female $35–$50/month, age 60 male $45–$60/month. Age 70 female $55–$80/month, age 70 male $70–$100/month. Age 80 female $100–$150/month, age 80 male $130–$190/month. Guaranteed issue plans cost 20–40% more than preferred plans. Many people are pleasantly surprised — most policies cost less than a dollar a day.",
+      "keywords": ["cost", "price", "how much", "premium", "monthly", "afford", "rate", "per month", "dollar a day", "cheap"]
+    },
+    {
+      "key": "factors_affecting_price",
+      "question": "What factors affect pricing?",
+      "answer": "Five main factors determine your final expense premium: (1) Age — the single biggest factor; younger applicants get significantly lower rates. (2) Gender — women typically pay 15–25% less than men of the same age. (3) Health status — Preferred plans (best health) get the lowest rates, Standard plans are mid-range, and Guaranteed Issue (any health) are the highest. (4) Coverage amount — more coverage means a higher premium, but the rate per thousand of coverage stays the same. (5) Tobacco use — smokers typically pay 25–50% more than non-smokers. Your state of residence can also affect rates slightly.",
+      "keywords": ["factors", "affect", "price", "age", "gender", "health", "tobacco", "smoking", "why different", "rate calculation"]
+    },
+    {
+      "key": "payment_options",
+      "question": "What payment options are available?",
+      "answer": "Most carriers offer multiple payment options: monthly bank draft (most popular — automatic withdrawal from your checking or savings account), monthly Social Security deduction (paid directly from your Social Security check, available with some carriers), quarterly billing (every 3 months), semi-annual billing (every 6 months, usually with a small discount), and annual billing (once a year, typically saves 5–8% compared to monthly). There's no extra charge for monthly payments. Most people prefer the bank draft because it's automatic and they never have to worry about missing a payment.",
+      "keywords": ["payment", "pay", "options", "bank draft", "social security", "automatic", "billing", "monthly", "annual", "how to pay"]
+    },
+    {
+      "key": "rate_lock",
+      "question": "Will my rate ever go up?",
+      "answer": "No — your rate locks in the day your policy is issued and it will never increase for any reason. Not when you turn 70, not when you turn 90, not if your health changes, not ever. This is guaranteed in writing in your policy contract. The only way your payment changes is if you voluntarily request a change in coverage amount. This rate lock is one of the biggest advantages of whole life over term life insurance.",
+      "keywords": ["rate increase", "go up", "locked in", "change", "premium increase", "guarantee", "never go up", "rate lock"]
+    }
+  ],
+
+
+  "underwriting": [
+    {
+      "key": "age_limits",
+      "question": "What are the age limits for final expense insurance?",
+      "answer": "The standard underwriting age range is 40 to 85 years old. Most carriers use this range. Some niche carriers accept applicants as young as 30 (usually for simplified issue plans) or as old as 89 (usually guaranteed issue only). The most competitive rates with the most carrier options are available for ages 50 to 75. Applications from people under 40 or over 85 should be referred to a specialist for alternative options.",
+      "keywords": ["age limit", "40", "85", "minimum age", "maximum age", "too young", "too old", "age range"]
+    },
+    {
+      "key": "health_questions",
+      "question": "What health questions are asked?",
+      "answer": "Health questions vary by carrier but typically cover these areas: (1) Have you been diagnosed with or treated for cancer in the last 2–5 years? (2) Have you had a heart attack, stroke, or congestive heart failure in the last 2 years? (3) Are you currently receiving treatment for kidney failure or dialysis? (4) Have you been diagnosed with ALS, dementia, or Alzheimer's? (5) Are you currently in a hospital, nursing home, or hospice? (6) Do you use oxygen equipment? (7) Have you been diagnosed with HIV/AIDS? (8) Have you had an organ transplant? Answering 'yes' to any question doesn't automatically disqualify you — it may move you to a Standard or Guaranteed Issue plan at a different rate.",
+      "keywords": ["health questions", "medical questions", "qualify", "conditions", "cancer", "heart", "diabetes", "stroke", "health history"]
+    },
+    {
+      "key": "approval_process",
+      "question": "How does the approval process work?",
+      "answer": "The approval process is fast and simple — most applications are approved the same day, often within minutes. Here's how it works: (1) Answer the health questions over the phone with a licensed agent. (2) The agent submits the application electronically to the carrier. (3) For Preferred and Standard plans, the carrier runs an MIB (Medical Information Bureau) and prescription drug check (no exam needed). (4) Approval decision comes back in minutes to 24 hours. (5) Once approved, coverage begins immediately — your policy is in force from the date of approval. (6) The physical policy document is mailed to your home within 7–14 business days along with your 30-day free look period.",
+      "keywords": ["approval", "process", "how long", "application", "approved", "timeline", "when does coverage start", "same day"]
+    },
+    {
+      "key": "plan_types",
+      "question": "What are the different plan types?",
+      "answer": "There are three main plan types: (1) Preferred — for people in good health with no major conditions. Lowest rates, full benefit from day one, no waiting period. (2) Standard — for people with some health issues like controlled diabetes, mild heart conditions, or being overweight. Slightly higher rates than Preferred, but still full benefit from day one. (3) Guaranteed Issue — for people with serious health conditions or who have been declined before. No health questions, guaranteed acceptance, but has a 2–3 year graded benefit period and costs 20–40% more. A licensed specialist will determine which plan type you qualify for based on your health answers.",
+      "keywords": ["plan types", "preferred", "standard", "guaranteed issue", "levels", "tiers", "which plan", "options"]
+    }
+  ],
+
+
+  "benefits": [
+    {
+      "key": "covers_funeral_costs",
+      "question": "What funeral costs does it cover?",
+      "answer": "The death benefit is paid directly to your named beneficiary as a lump sum, tax-free, usually within 24 to 48 hours of filing a claim. Your beneficiary can use the money for anything — there are no restrictions. Common uses include: funeral home services ($2,000–$4,000), casket ($2,000–$10,000+) or cremation ($1,000–$3,500), burial plot and headstone ($1,000–$4,000), flowers and obituary ($500–$1,500), reception or repast after the service ($500–$2,000), outstanding medical bills, credit card debt, mortgage or rent, or leaving a small inheritance. The average total funeral cost in the U.S. is $7,848 for cremation with services and $12,000–$15,000+ for a traditional burial.",
+      "keywords": ["funeral costs", "cover", "what does it pay", "casket", "burial", "cremation", "expenses", "benefit", "uses"]
+    },
+    {
+      "key": "no_burden_on_family",
+      "question": "How does it protect my family from financial burden?",
+      "answer": "Without final expense coverage, your family faces an immediate financial burden at the worst possible time. The average funeral costs $12,000–$15,000 and most funeral homes require payment upfront or within 30 days. That means your loved ones would need to come up with thousands of dollars out of pocket — using savings, credit cards, personal loans, or asking others for help. With a final expense policy, the insurance carrier pays your beneficiary directly, usually within 24–48 hours. Your family doesn't pay a dime out of pocket. They can focus entirely on grieving and healing instead of scrambling for money.",
+      "keywords": ["family", "burden", "protect", "financial", "out of pocket", "benefit", "why insurance", "peace of mind"]
+    },
+    {
+      "key": "fixed_premiums",
+      "question": "Are the premiums really fixed for life?",
+      "answer": "Yes — 100% guaranteed. Your premium is locked in on the issue date and will never increase for any reason. This is contractually guaranteed in your policy. It doesn't matter if you age, if your health changes, or if the insurance company raises rates for new customers — YOUR rate stays the same forever. This is a core feature of whole life insurance and one of the reasons it's so popular for final expense planning. You'll pay the same amount at age 90 that you paid when you first got the policy.",
+      "keywords": ["fixed", "premium", "locked", "never increase", "guaranteed", "rate lock", "permanent", "for life"]
+    },
+    {
+      "key": "builds_cash_value",
+      "question": "Does the policy build cash value?",
+      "answer": "Yes, because final expense insurance is whole life, it builds guaranteed cash value over time. The cash value grows tax-deferred and is guaranteed by the insurance carrier — it cannot decrease. After the first few years, you can borrow against the cash value if you need funds for an emergency. The loan comes from the insurance company (not a bank), there's no credit check, and you don't have to pay it back — though any outstanding loan balance is deducted from the death benefit. Think of it as a small savings component on top of the protection. Most people don't buy final expense for the cash value, but it's a nice bonus.",
+      "keywords": ["cash value", "savings", "borrow", "loan", "equity", "investment", "builds value", "tax deferred"]
+    },
+    {
+      "key": "tax_free_benefit",
+      "question": "Is the death benefit tax-free?",
+      "answer": "Yes, life insurance death benefits are tax-free under current federal law (IRC Section 101). Your beneficiary receives the full face amount of the policy with zero federal income tax owed. There is also no probate involved — the money goes directly to your named beneficiary, bypassing the estate entirely. This makes it one of the most efficient ways to transfer money to your loved ones. The benefit is also protected from creditors in most states.",
+      "keywords": ["tax free", "taxes", "irs", "income tax", "probate", "estate", "creditors"]
+    },
+    {
+      "key": "payout_speed",
+      "question": "How quickly does the family get paid?",
+      "answer": "Most insurance carriers process final expense claims within 24 to 48 hours once the claim form and death certificate are submitted. Many carriers now offer direct deposit, so the money can be in your beneficiary's bank account within 1–2 business days. If paid by check, it typically arrives within 7–10 business days. This is much faster than settling an estate through probate (which can take months or years) and faster than GoFundMe or other crowdfunding approaches. Your family has immediate access to funds when they need them most.",
+      "keywords": ["payout", "how fast", "how quickly", "claim", "24 hours", "48 hours", "speed", "when get money", "direct deposit"]
+    },
+    {
+      "key": "free_look_period",
+      "question": "What is the 30-day free look period?",
+      "answer": "Every final expense policy comes with a mandatory 30-day free look period (some states require even longer). Once your policy is mailed to you, you have a full 30 days to review every page. If you change your mind for any reason — or no reason at all — you simply return the policy and receive a complete 100% refund of any premiums paid. No questions asked, no penalties, no hassle. This is required by law and gives you total peace of mind that you can try the coverage risk-free.",
+      "keywords": ["free look", "30 day", "cancel", "refund", "trial", "risk free", "return", "change mind", "money back"]
+    }
+  ],
+
+
+  "objection_rebuttals": [
+    {
+      "key": "too_expensive",
+      "question": "Customer says: 'It's too expensive / I can't afford it'",
+      "answer": "Acknowledge their concern genuinely — most people on fixed income are careful with money. Then reframe: plans start as low as $20-30/month, which is less than a dollar a day — less than a cup of coffee. Compare that small amount to the $12,000-$15,000 their family would have to come up with all at once without coverage. Ask if they'd want their family protected if you could find something that fits their budget. Many people are surprised at how affordable it actually is once they see their specific rate.",
+      "keywords": ["expensive", "afford", "cost", "money", "budget", "fixed income", "too much", "price", "cheap", "dollar a day"]
+    },
+    {
+      "key": "need_to_think",
+      "question": "Customer says: 'I need to think about it'",
+      "answer": "Respect their desire to take it seriously — this IS an important decision. Then share a key fact: rates are based on your age at the time you apply, so every birthday that passes means higher rates. And if health changes, rates go up more or you could be declined entirely. Getting numbers today doesn't mean committing today — it just means having the real facts to think about instead of guessing. There's zero obligation, and at least they'll know their exact rate while it's at its lowest.",
+      "keywords": ["think about it", "not sure", "decide later", "think", "consider", "sleep on it", "call back", "time"]
+    },
+    {
+      "key": "already_have_coverage",
+      "question": "Customer says: 'I already have coverage'",
+      "answer": "Commend them for planning ahead — most people have done nothing. Then explore common gaps: employer/group life insurance ends when you retire or leave the job. VA benefits cover cemetery burial but not the funeral service itself. Old policies may not have kept up with rising funeral costs ($12,000-$15,000 average). A final expense policy fills these gaps — it's not about replacing what you have, it's about making sure there's no shortfall. Offer to have a specialist review their current coverage at no charge.",
+      "keywords": ["already have", "covered", "insurance", "through work", "employer", "military", "VA", "enough", "group life"]
+    },
+    {
+      "key": "dont_trust_insurance",
+      "question": "Customer says: 'I don't trust insurance companies'",
+      "answer": "Validate their skepticism — some companies have earned that reputation. Then differentiate: these policies are regulated and backed by the state Department of Insurance, not some fly-by-night operation. Everything is in plain-English writing in the policy contract. The 30-day free look period means zero risk — read every word, and if you don't like anything, get a full refund. The benefit is contractually guaranteed. Ask if they'd feel comfortable looking at it risk-free for 30 days with a full money-back guarantee.",
+      "keywords": ["trust", "scam", "fraud", "rip off", "don't trust", "scheme", "trick", "take money", "ripoff"]
+    },
+    {
+      "key": "family_can_handle_it",
+      "question": "Customer says: 'My family can handle it / GoFundMe'",
+      "answer": "Acknowledge that families always figure it out because that's what families do. Then share reality: GoFundMe campaigns for funerals raise about $2,000 on average — against a $12,000+ funeral bill. That's a $10,000 gap. Somebody has to cover that, usually with credit cards, savings, or loans at the worst possible time. Most people say they don't want to be a burden on their family. For less than a dollar a day, they can guarantee their family won't have to stress about money while grieving.",
+      "keywords": ["family", "handle", "gofundme", "kids", "children", "figure it out", "crowdfund", "savings", "church"]
+    },
+    {
+      "key": "too_healthy",
+      "question": "Customer says: 'I'm healthy / don't need it yet'",
+      "answer": "Celebrate their good health — genuinely great news. Then reframe timing: the best time to get coverage is WHILE you're healthy. Once something changes — a diagnosis, a hospital visit — rates go up significantly or you could be denied entirely. Locking in a rate now while health is good means the cheapest premium they'll ever get. It's like buying an umbrella before it rains. Every day that passes, it costs more and the risk of becoming uninsurable increases.",
+      "keywords": ["healthy", "don't need", "young", "good shape", "not sick", "too young", "plenty of time", "not dying"]
+    },
+    {
+      "key": "just_cremate_me",
+      "question": "Customer says: 'Just cremate me / I don't need a funeral'",
+      "answer": "Respect their wishes entirely — lots of people prefer simplicity. Then educate on actual costs: even a basic direct cremation costs $1,000–$3,500. Add a simple memorial service, urn, and paperwork and you're at $3,000–$7,000. If there are outstanding medical bills, credit card debt, or a mortgage — those don't disappear either. Somebody still has to pay. A small policy ensures even the simplest goodbye is covered without burdening family. Ask if they'd want their family covered even for just the basics.",
+      "keywords": ["cremate", "cremation", "no funeral", "burn me", "pine box", "cheapest", "simple", "don't care"]
+    },
+    {
+      "key": "send_info_first",
+      "question": "Customer says: 'Just send me something in the mail'",
+      "answer": "Understand wanting to review on their own time. Explain: a mailed brochure is generic — it won't show their specific rate, which depends on age and health. A licensed specialist can give them a personalized quote in about 5 minutes over the phone — way more helpful than a one-size-fits-all flyer. Zero obligation — they just get their real numbers, write them down, and think about it as long as they want. But at least they'll have actual facts instead of guessing. Ask if they'd be open to just getting their specific numbers real quick.",
+      "keywords": ["send info", "mail", "email", "brochure", "website", "information", "packet", "mail me", "send me"]
+    },
+    {
+      "key": "talk_to_spouse",
+      "question": "Customer says: 'I need to talk to my spouse / family first'",
+      "answer": "Absolutely respect their desire to discuss it. Many of our policyholders say their family was actually the reason they got covered — they didn't want to leave a burden behind. Offer a practical solution: get the numbers now so they have real information to discuss with their spouse, instead of vagaries. The specialist can even include the spouse on the call if they're available. And either way, there's zero obligation — they're just gathering facts to make an informed family decision.",
+      "keywords": ["spouse", "wife", "husband", "partner", "family", "talk to", "discuss", "ask", "permission"]
+    }
+  ],
+
+
+  "state_specific_info": [
+    {
+      "key": "california",
+      "question": "What should I know about final expense insurance in California?",
+      "answer": "California requires a 30-day free look period for all life insurance policies. It is a two-party consent state — the prospect MUST be informed and consent to call recording at the start of the call. The California Department of Insurance regulates all policies. California has specific telemarketing regulations under the California Business and Professions Code. No specific state premium tax surcharge applies to the policyholder. Licensed agents must hold a California Life-Only or Life & Health license. Most major final expense carriers are available in California.",
+      "keywords": ["california", "CA", "west coast", "two-party consent", "recording consent"]
+    },
+    {
+      "key": "texas",
+      "question": "What should I know about final expense insurance in Texas?",
+      "answer": "Texas is a one-party consent state for call recording. The Texas Department of Insurance (TDI) regulates all policies. Texas has a large senior population and strong final expense market. No state income tax means premiums come from gross income. Texas does not impose additional premium taxes on the policyholder. Free look period is 30 days. Most major carriers operate in Texas with competitive rates. Licensed agents must hold a Texas Life & Health or Life-Only license.",
+      "keywords": ["texas", "TX", "one-party consent", "TDI"]
+    },
+    {
+      "key": "florida",
+      "question": "What should I know about final expense insurance in Florida?",
+      "answer": "Florida has one of the largest senior populations in the country, making it a major final expense market. Florida is a two-party consent state — prospects must be informed of and consent to call recording. The Florida Office of Insurance Regulation oversees all policies. Florida has no state income tax. Free look period is at least 14 days (some carriers offer 30). Florida has specific requirements for the sale of insurance to seniors. Most major carriers are available with competitive rates. Licensed agents need a Florida Life & Health or Life-Only license.",
+      "keywords": ["florida", "FL", "two-party consent", "senior population"]
+    },
+    {
+      "key": "new_york",
+      "question": "What should I know about final expense insurance in New York?",
+      "answer": "New York has some of the strictest insurance regulations in the country. The New York Department of Financial Services (DFS) regulates all policies. Policies sold in New York must be specifically approved for the state — not all carriers operate in NY. New York is a one-party consent state for recording. Free look period is 10 days (20 days if replacement). New York has specific requirements around insurance illustrations and suitability. Premiums may be slightly higher due to regulatory costs. Agents must be licensed specifically in New York.",
+      "keywords": ["new york", "NY", "NYC", "strict regulation", "DFS"]
+    },
+    {
+      "key": "ohio",
+      "question": "What should I know about final expense insurance in Ohio?",
+      "answer": "Ohio is a one-party consent state for call recording. The Ohio Department of Insurance regulates all policies. Ohio has a large senior population, particularly in cities like Columbus, Cleveland, and Cincinnati. No unusual state-specific surcharges apply. Free look period is 10-30 days depending on the carrier. Most major final expense carriers operate in Ohio with standard rates. Licensed agents must hold an Ohio Life & Health license.",
+      "keywords": ["ohio", "OH", "midwest", "columbus", "cleveland"]
+    },
+    {
+      "key": "pennsylvania",
+      "question": "What should I know about final expense insurance in Pennsylvania?",
+      "answer": "Pennsylvania is a two-party consent state — call recording requires informing and gaining consent from the prospect. The Pennsylvania Insurance Department regulates all policies. Free look period is at least 10 days, though many carriers offer 30 days. Pennsylvania has a large senior population. Most major carriers offer competitive rates. Licensed agents need a Pennsylvania Life & Health or Life-Only license. The state has standard final expense regulations without unusual requirements.",
+      "keywords": ["pennsylvania", "PA", "philly", "philadelphia", "pittsburgh", "two-party consent"]
+    },
+    {
+      "key": "illinois",
+      "question": "What should I know about final expense insurance in Illinois?",
+      "answer": "Illinois is a two-party consent state — all parties on the call must consent to recording. The Illinois Department of Insurance regulates all policies. Chicago and surrounding metro area have a large senior population. Free look period is 10-30 days depending on the carrier. Most major final expense carriers operate in Illinois. State regulations are generally standard for the industry. Licensed agents must hold an Illinois Life & Health license.",
+      "keywords": ["illinois", "IL", "chicago", "two-party consent"]
+    },
+    {
+      "key": "general_state_info",
+      "question": "What are the general rules that vary by state?",
+      "answer": "Key things that vary by state: (1) Call recording consent — some states (CA, FL, IL, PA, MD, MA, MT, NH, WA, CT) require two-party consent (you must inform the prospect); other states are one-party consent. (2) Free look periods — range from 10 to 30 days. (3) Carrier availability — not all carriers operate in every state. (4) Premium rates — can vary slightly by state due to regulation and market factors. (5) Agent licensing — agents must be licensed in the state where the prospect resides. (6) Telemarketing rules — some states have additional restrictions beyond federal TCPA requirements. Always verify current state-specific rules before calling into a new state.",
+      "keywords": ["state", "regulation", "consent", "two-party", "one-party", "rules", "vary", "different states"]
+    }
+  ],
+
+
+  "competitor_comparison": [
+    {
+      "key": "vs_term_life",
+      "question": "How does final expense compare to term life insurance?",
+      "answer": "Term life insurance provides coverage for a set period (10, 20, or 30 years) and then expires with nothing to show for it. Final expense is whole life — it never expires, premiums never increase, and it builds cash value. Term life is designed for income replacement during working years (often $250K–$1M), while final expense is designed specifically for end-of-life costs ($5K–$25K). Term life requires a medical exam and detailed underwriting; final expense requires no exam and minimal health questions. Term life becomes very expensive or unavailable after age 60–65; final expense is designed for ages 40–85. For the purpose of covering funeral and burial costs, final expense is the better, more affordable choice.",
+      "keywords": ["term life", "term insurance", "compare", "difference", "vs term", "which is better", "expires"]
+    },
+    {
+      "key": "vs_whole_life",
+      "question": "How does final expense compare to traditional whole life insurance?",
+      "answer": "Final expense IS a type of whole life insurance — but it's simplified and smaller. Traditional whole life policies can range from $50,000 to $1,000,000+ with extensive medical underwriting, exams, and higher premiums. Final expense whole life is designed to be accessible: smaller coverage amounts ($5K–$25K), no medical exam, simplified underwriting (just phone questions), lower premiums, and faster approval (often same-day vs weeks). Both share the same core benefits: lifelong coverage, fixed premiums, guaranteed death benefit, and cash value accumulation. Final expense is simply whole life that's been streamlined for the specific purpose of covering end-of-life costs.",
+      "keywords": ["whole life", "traditional", "compare", "difference", "vs whole life", "regular life insurance"]
+    },
+    {
+      "key": "vs_burial_insurance",
+      "question": "What's the difference between final expense and burial insurance?",
+      "answer": "Final expense insurance and burial insurance are essentially the same product — the terms are used interchangeably in the industry. Both refer to small whole life policies ($5K–$25K) designed to cover funeral, burial, and other end-of-life costs. Some companies market 'burial insurance' as a more specific product tied to a funeral home, but the policies themselves are functionally identical: whole life, no medical exam, fixed premiums, tax-free benefit. The term 'final expense' is more commonly used by insurance professionals because it reflects the broader use of the benefit (not just burial costs).",
+      "keywords": ["burial insurance", "funeral insurance", "same", "difference", "burial vs final expense", "interchangeable"]
+    },
+    {
+      "key": "vs_preneed",
+      "question": "How does final expense compare to preneed funeral plans?",
+      "answer": "Preneed (or pre-arranged) funeral plans are sold directly by funeral homes and lock in today's prices for a specific funeral package. Final expense insurance, by contrast, pays a cash benefit to your beneficiary who can use it however they choose. Key differences: Preneed is tied to one specific funeral home — if you move or the funeral home closes, there can be complications. Final expense is portable — it goes wherever you go. Preneed covers only the funeral services you pre-selected. Final expense covers anything — funeral, cremation, debts, bills, or whatever your family needs. Final expense gives your family flexibility and control; preneed gives funeral price certainty. Many people prefer final expense for its flexibility.",
+      "keywords": ["preneed", "pre-need", "pre-arranged", "funeral home", "pre-plan", "funeral plan"]
+    },
+    {
+      "key": "vs_savings_account",
+      "question": "Why not just save money in a bank account instead?",
+      "answer": "A dedicated savings account is disciplined, but insurance has key advantages: (1) Immediate full benefit — even if you've only paid one month's premium, your family gets the full death benefit. With savings, if something happens early, you've only saved a fraction. (2) Tax-free — life insurance proceeds are tax-free; savings account interest is taxable. (3) No probate — life insurance pays directly to the beneficiary; bank accounts may go through probate which can take months. (4) Protected from creditors — insurance benefits are protected in most states; bank accounts may not be. (5) Guaranteed — your benefit is contractually guaranteed; savings can be spent, depleted, or lost. (6) Discipline — it's a fixed monthly commitment; savings accounts are easy to dip into.",
+      "keywords": ["savings", "bank account", "save money", "bank", "why not save", "invest", "CD"]
+    }
+  ],
+
+
+  "compliance_info": [
+    {
+      "key": "tcpa_compliance",
+      "question": "What are the TCPA rules?",
+      "answer": "The Telephone Consumer Protection Act (TCPA) governs all telemarketing calls. Key requirements: (1) Leads must have provided prior express written consent to receive calls. (2) Do not call numbers on the National Do-Not-Call Registry without prior business relationship. (3) Honor all Do-Not-Call requests immediately — add to internal DNC list within 24 hours. (4) Calls can only be made between 8 AM and 9 PM in the prospect's local time zone. (5) Caller must identify themselves and the company at the beginning of the call. (6) Live answer required — robocall restrictions apply. Violations carry penalties of $500–$1,500 per call.",
+      "keywords": ["tcpa", "compliance", "legal", "do not call", "regulation", "telemarketing", "consent", "rules"]
+    },
+    {
+      "key": "recording_disclosure",
+      "question": "When do I need to disclose call recording?",
+      "answer": "Call recording disclosure requirements depend on the state. Two-party consent states (MUST inform and get consent): California, Connecticut, Florida, Illinois, Maryland, Massachusetts, Montana, New Hampshire, Pennsylvania, Washington. One-party consent states (all other states): recording is legal as long as one party (the bot/agent) consents, no disclosure to the prospect is required. Best practice: ALWAYS disclose recording at the start of every call regardless of state — it builds trust and ensures compliance. Standard disclosure: 'This call may be recorded for quality assurance and training purposes.'",
+      "keywords": ["recording", "recorded", "consent", "two-party", "disclose", "disclosure", "privacy"]
+    },
+    {
+      "key": "dnc_compliance",
+      "question": "How should Do-Not-Call requests be handled?",
+      "answer": "When a prospect requests to be placed on the Do-Not-Call list: (1) IMMEDIATELY stop all selling — do not try to overcome this. It is not an objection, it is a legal request. (2) Confirm verbally: 'I'm removing your number from our list right now.' (3) Add the number to the internal DNC list within the same business day. (4) The number must remain on the internal DNC list for at least 5 years. (5) Log the date, time, and method of the request. (6) End the call politely. Never attempt to persuade someone who has made a DNC request to stay on the phone.",
+      "keywords": ["dnc", "do not call", "remove", "stop calling", "opt out", "unsubscribe", "take off list"]
+    },
+    {
+      "key": "licensing",
+      "question": "What insurance licensing is required?",
+      "answer": "Insurance sales — including quoting rates and recommending plans — must be conducted by or under the supervision of a licensed insurance agent. The AI voice bot qualifies leads, educates about the product, and collects information, but it does NOT sell insurance or quote specific rates — it transfers qualified leads to a licensed human agent (closer) who does. The closer must hold a valid Life & Health or Life-Only insurance license in the prospect's state of residence. Agents must also complete any state-required continuing education. Unlicensed insurance sales carry significant legal penalties.",
+      "keywords": ["license", "licensed", "agent", "legal", "requirement", "sell insurance", "closer"]
+    }
+  ],
+
+
+  "faq": [
+    {
+      "key": "missed_payment",
+      "question": "What happens if I miss a payment?",
+      "answer": "Most final expense policies have a 30-day grace period for missed payments. During the grace period, your coverage remains fully in force — you're still protected. If payment isn't received within the grace period, the policy may lapse. However, most carriers offer a reinstatement period (typically 6 months to 2 years) where you can reactivate the policy by paying the past-due premiums. If the policy has enough cash value, it may also continue under an automatic premium loan provision. To avoid missed payments, most people set up automatic bank draft — it's the most popular option.",
+      "keywords": ["miss payment", "late", "lapse", "grace period", "reinstate", "forgot to pay", "skipped payment"]
+    },
+    {
+      "key": "beneficiary",
+      "question": "Who can I name as my beneficiary?",
+      "answer": "You can name anyone as your beneficiary — spouse, child, grandchild, sibling, friend, church, charity, or even a funeral home directly. You can name multiple beneficiaries and split the benefit by percentage (e.g., 50% to your daughter, 50% to your son). You can also name a primary and contingent (backup) beneficiary. Changing your beneficiary is free and can be done at any time by contacting the insurance carrier. Minors (under 18) can be named but a guardian or custodian should be designated to manage the funds.",
+      "keywords": ["beneficiary", "who gets money", "name", "change beneficiary", "spouse", "child", "multiple"]
+    },
+    {
+      "key": "waiting_period",
+      "question": "Is there a waiting period before coverage starts?",
+      "answer": "It depends on the plan type. Preferred and Standard plans have NO waiting period — your full death benefit is active from day one. If something happens the day after your policy is issued, your beneficiary receives the full benefit. Guaranteed Issue plans (no health questions, everyone accepted) DO have a 2–3 year graded benefit period. During this time, if death occurs from natural causes, the beneficiary receives a return of all premiums paid plus 10% interest — not the full death benefit. After the graded period ends, the full benefit applies. Accidental death is covered in full from day one on all plan types.",
+      "keywords": ["waiting period", "graded", "when does it start", "effective", "day one", "coverage start"]
+    },
+    {
+      "key": "preexisting_conditions",
+      "question": "Can I get coverage with pre-existing conditions?",
+      "answer": "Yes — there are options for almost every health situation. Preferred plans are for people in good health. Standard plans cover people with manageable conditions like controlled diabetes, high blood pressure, mild COPD, or history of non-recent cancer. Guaranteed Issue plans accept everyone regardless of health — even if you've been declined before, are on dialysis, have active cancer, or any other condition. The rates are higher for Guaranteed Issue, and there's a graded benefit period, but you WILL be accepted. A licensed specialist will go through the health questions with you and find the best plan you qualify for at the lowest rate.",
+      "keywords": ["pre-existing", "condition", "health", "sick", "disease", "diabetes", "cancer", "heart", "COPD", "declined"]
+    },
+    {
+      "key": "cancel_policy",
+      "question": "Can I cancel my policy?",
+      "answer": "Yes, you can cancel your policy at any time with no penalties, fees, or hassle. During the first 30 days (free look period), you receive a 100% full refund of all premiums paid — no questions asked. After the free look period, you can still cancel anytime. If the policy has built cash value, you'll receive the cash surrender value. There are no cancellation fees. To cancel, simply call the insurance carrier directly or have your agent submit the cancellation request. The policy terminates and all premium obligations end immediately.",
+      "keywords": ["cancel", "stop", "quit", "end policy", "surrender", "refund", "return policy"]
+    },
+    {
+      "key": "how_claim_works",
+      "question": "How does the claims process work?",
+      "answer": "When the time comes, your beneficiary calls the insurance carrier's claims department (the number is on the policy). They'll need to provide: (1) the policy number, (2) a certified copy of the death certificate, and (3) a completed claim form (the carrier provides this). Most carriers also accept claims online or by mail. Processing typically takes 24–48 hours for direct deposit or 7–10 business days for a check. The benefit is paid as a lump sum directly to the beneficiary — tax-free, no probate. Many funeral homes will also work directly with the insurance carrier if the funeral home is named as the beneficiary.",
+      "keywords": ["claim", "claims process", "file claim", "death certificate", "how to claim", "payout process"]
+    },
+    {
+      "key": "difference_from_medicare",
+      "question": "Does Medicare or Medicaid cover funeral costs?",
+      "answer": "No — Medicare and Medicaid do NOT cover funeral or burial costs. Medicare covers medical expenses for people 65+ but provides zero death benefit. Medicaid may cover some end-of-life medical costs depending on the state, but it does not pay for funeral services, cremation, caskets, or burial. Social Security provides a one-time lump-sum death payment of only $255 (yes, two hundred fifty-five dollars) to a surviving spouse or child. That's it. Final expense insurance is specifically designed to fill this gap and ensure your family has the funds to cover everything Medicare and Social Security do not.",
+      "keywords": ["medicare", "medicaid", "social security", "government", "VA", "benefits", "death benefit", "255"]
+    }
+  ]
+}

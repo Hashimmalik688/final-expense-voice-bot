@@ -1,0 +1,85 @@
+# /etc/systemd/system/voicebot@.service
+#
+# Parameterised service template for running MULTIPLE bot workers on one VPS.
+#
+# Each instance handles exactly one SIP call at a time.
+# vLLM + TTS are shared by all instances (already running as separate services).
+#
+# DEPLOY:
+#   sudo cp scripts/voicebot@.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable voicebot@1 voicebot@2 voicebot@3
+#   sudo systemctl start  voicebot@1 voicebot@2 voicebot@3
+#
+# STATUS:
+#   systemctl status 'voicebot@*'
+#   journalctl -u voicebot@1 -f
+#
+# CAPACITY (A100 40 GB):
+#   vLLM max-num-seqs=30 → 30 simultaneous LLM generations.
+#   Each bot = 1 worker process = 1 active SIP call.
+#   Run up to 30 instances before needing a second GPU.
+#
+# MULTIPLE GPUS / VPS NODES:
+#   Spin up a second vLLM on another port (8002) or another server.
+#   Set VLLM_API_URL=http://127.0.0.1:8002 for workers 16-30, etc.
+#   Or use an Nginx upstream round-robin across two vLLM endpoints.
+#
+# VICIDIAL MULTI-BOT REQUIREMENTS:
+#   • One Asterisk SIP peer per bot:  [voicebot1], [voicebot2], ...
+#   • One VICIdial agent user per bot: voicebot1, voicebot2, ...
+#   • All assigned to the same campaign.
+#   • Each Dial() in extensions.conf points to the corresponding SIP peer.
+
+[Unit]
+Description=Final Expense VoiceBot — worker instance %i
+Documentation=https://github.com/yourorg/final-expense-voice-bot
+After=network.target redis.service voicebot-vllm.service voicebot-tts.service
+Wants=network-online.target redis.service
+Requires=voicebot-vllm.service voicebot-tts.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/voicebot
+
+# Base environment from the shared .env file
+EnvironmentFile=/opt/voicebot/.env
+
+# Per-instance overrides — %i is replaced with the instance number (1, 2, 3…)
+Environment=BOT_ID=%i
+Environment=SIP_USERNAME=voicebot%i
+Environment=SIP_PASSWORD=REPLACE_WITH_BOT%i_SIP_PASSWORD
+Environment=VICIDIAL_AGENT_USER=voicebot%i
+Environment=VICIDIAL_AGENT_PASS=REPLACE_WITH_BOT%i_AGENT_PASSWORD
+Environment=API_PORT=900%i
+
+# All bots share the same vLLM + TTS (already set in .env).
+# To split bots across two vLLM instances, override for half of them:
+#   For instances 16-30:  Environment=VLLM_API_URL=http://127.0.0.1:8002
+
+# Wait for vLLM and TTS to be healthy before accepting calls
+ExecStartPre=/bin/bash -c '\
+    for i in $(seq 1 60); do \
+        curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1 && \
+        curl -sf http://127.0.0.1:8001/health > /dev/null 2>&1 && break; \
+        echo "Waiting for vLLM+TTS ($i/60)…"; sleep 5; \
+    done'
+
+ExecStart=/opt/voicebot/.venv/bin/uvicorn src.main:app \
+    --host 0.0.0.0 \
+    --port 900%i \
+    --workers 1 \
+    --loop asyncio \
+    --log-level info
+
+Restart=always
+RestartSec=10
+TimeoutStartSec=600
+TimeoutStopSec=30
+
+StandardOutput=append:/var/log/voicebot/voicebot%i.log
+StandardError=append:/var/log/voicebot/voicebot%i.log
+
+[Install]
+WantedBy=multi-user.target
