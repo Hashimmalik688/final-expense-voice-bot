@@ -305,8 +305,15 @@ if [[ -f /etc/redis/redis.conf ]]; then
     sed -i 's/^bind .*/bind 127.0.0.1 -::1/' /etc/redis/redis.conf
     sed -i 's/^protected-mode .*/protected-mode yes/' /etc/redis/redis.conf
 fi
-systemctl enable redis-server
-systemctl start redis-server
+# Vast.ai containers don't have systemd — start Redis directly as a daemon
+if command -v systemctl &>/dev/null && systemctl is-system-running &>/dev/null 2>&1; then
+    systemctl enable redis-server
+    systemctl start redis-server
+else
+    # No systemd (Docker/container environment like Vast.ai)
+    redis-server --daemonize yes --bind 127.0.0.1 --protected-mode yes
+    sleep 1
+fi
 redis-cli ping | grep -q PONG && ok "Redis running on localhost:6379"
 
 
