@@ -349,6 +349,12 @@ _pip_upgrade() {
     "$1/bin/pip" install --upgrade pip wheel setuptools -q
 }
 
+# Like _pip_upgrade but caps setuptools at <70 so legacy setup.py files that
+# import pkg_resources (e.g. openai-whisper) still build correctly.
+_pip_upgrade_compat() {
+    "$1/bin/pip" install --upgrade pip wheel "setuptools<70" -q
+}
+
 # ─── 6a. Bot venv ─────────────────────────────────────────────────────────────
 info "Creating bot venv: $VENV_BOT"
 [[ -d "$VENV_BOT" ]] || "$PYTHON_BIN" -m venv "$VENV_BOT"
@@ -407,16 +413,36 @@ cd /
 
 info "Creating CosyVoice venv: $VENV_TTS"
 [[ -d "$VENV_TTS" ]] || "$PYTHON_BIN" -m venv "$VENV_TTS"
-_pip_upgrade "$VENV_TTS"
+# Use compat upgrader: setuptools<70 keeps pkg_resources importable, which is
+# required by openai-whisper's legacy setup.py (line 5 imports pkg_resources).
+_pip_upgrade_compat "$VENV_TTS"
 
 info "Installing CosyVoice 2 dependencies …"
 "${VENV_TTS}/bin/pip" install -q \
     "torch>=2.5.0" "torchaudio>=2.5.0" \
     --index-url "$TORCH_CUDA_INDEX"
+
+# Pre-install numpy before the full requirements file: pyworld's setup.py
+# imports numpy at build time and will fail if it isn't present yet.
+"${VENV_TTS}/bin/pip" install -q "numpy==1.26.4"
+
+# --no-build-isolation: uses the venv's already-installed setuptools/numpy so
+# that pkg_resources (openai-whisper) and numpy (pyworld) are visible to each
+# package's build backend subprocess.
 "${VENV_TTS}/bin/pip" install -q \
-    -r "${COSYVOICE_SRC}/requirements.txt"
+    -r "${COSYVOICE_SRC}/requirements.txt" \
+    --no-build-isolation
+
+# CosyVoice has no setup.py / pyproject.toml → editable install is not
+# possible. Instead, drop a .pth file so the source tree is on sys.path.
+SITE_PKGS="$("${VENV_TTS}/bin/python" -c \
+    'import sysconfig; print(sysconfig.get_path("purelib"))')"
+echo "$COSYVOICE_SRC" > "${SITE_PKGS}/cosyvoice-src.pth"
+# Also add the Matcha-TTS submodule that CosyVoice imports from third_party/
+echo "${COSYVOICE_SRC}/third_party/Matcha-TTS" >> "${SITE_PKGS}/cosyvoice-src.pth"
+info "CosyVoice source added to sys.path via ${SITE_PKGS}/cosyvoice-src.pth"
+
 "${VENV_TTS}/bin/pip" install -q \
-    -e "$COSYVOICE_SRC" \
     "fastapi>=0.115.0" \
     "uvicorn[standard]>=0.30.0"
 ok "CosyVoice venv ready: $VENV_TTS"
