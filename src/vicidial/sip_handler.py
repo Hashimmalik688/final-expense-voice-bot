@@ -795,7 +795,7 @@ class SIPHandler:
         return False
 
     # ─────────────────────────────────────────────────────────────────────
-    # Simulation helpers  (for local testing without Asterisk)
+    # Internal helpers
     # ─────────────────────────────────────────────────────────────────────
 
     def _get_live_call(self, call_id: str):
@@ -807,66 +807,8 @@ class SIPHandler:
                 return call_obj
         return None
 
-    async def simulate_incoming_call(
-        self,
-        call_id: str,
-        remote_uri: str = "sip:prospect@vicidial",
-        lead_phone: str = "2145550001",
-        lead_id: str = "12345",
-    ) -> SIPCall:
-        """Create a fake incoming call for local testing.
-
-        Populates ``_active_calls``, invokes ``on_incoming_call`` callback,
-        and returns the ``SIPCall`` object.
-
-        Example::
-
-            handler = SIPHandler(simulation_mode=True)
-            call = await handler.simulate_incoming_call("test-001")
-        """
-        sip_call = SIPCall(
-            call_id    = call_id,
-            remote_uri = remote_uri,
-            local_uri  = f"sip:{self._config.username}@{self._config.server}",
-            lead_phone = lead_phone,
-            lead_id    = lead_id,
-            state      = SIPCallState.RINGING,
-        )
-        self._active_calls[call_id] = sip_call
-
-        audio_in, send_audio = await self.answer_call(call_id)
-
-        if self._on_incoming_call:
-            asyncio.create_task(
-                self._on_incoming_call(sip_call, audio_in, send_audio)
-            )
-
-        return sip_call
-
-    def feed_audio(self, call_id: str, audio_pcm16_8khz: bytes) -> None:
-        """Push raw PCM audio into a simulated call's inbound queue.
-
-        Use this in tests to simulate the prospect speaking.
-
-        Parameters
-        ----------
-        audio_pcm16_8khz:
-            Raw little-endian 16-bit signed PCM at 8 kHz.
-            The bridge will upsample to 16 kHz for the STT engine.
-        """
-        bridge = self._bridges.get(call_id)
-        if bridge:
-            # Convert to µ-law first (what the bridge expects from RTP)
-            ulaw = audioop.lin2ulaw(audio_pcm16_8khz, 2)
-            bridge.put_inbound_threadsafe(ulaw)
-        else:
-            logger.warning("feed_audio: no bridge for call %s", call_id)
-
-    # ─────────────────────────────────────────────────────────────────────    # Backward-compatible aliases
-    # ─────────────────────────────────────────────────────────────────
-
     async def transfer(self, call_id: str, extension: str) -> bool:
-        """Alias for ``blind_transfer`` — kept for test / legacy compatibility."""
+        """Alias for ``blind_transfer``."""
         return await self.blind_transfer(call_id, extension)
 
     # ─────────────────────────────────────────────────────────────────    # Introspection
