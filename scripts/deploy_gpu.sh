@@ -660,13 +660,20 @@ else
     _hf_dl() { "${HF_CLI[@]}" download "$@"; }
 
     # ── Llama 3.1 8B Instruct ─────────────────────────────────────────────────
-    # Using the unsloth mirror (ungated, identical weights to meta-llama gated repo)
-    info "Downloading Llama-3.1-8B-Instruct (unsloth/Meta-Llama-3.1-8B-Instruct) → ${MODEL_DIR}/llama"
+    # Use the official meta-llama repo when an HF token is available (approved access);
+    # fall back to the unsloth public mirror which has identical weights.
+    if [[ -n "$HF_TOKEN" ]]; then
+        _LLAMA_REPO="meta-llama/Llama-3.1-8B-Instruct"
+        info "Downloading Llama-3.1-8B-Instruct (official meta-llama) → ${MODEL_DIR}/llama"
+    else
+        _LLAMA_REPO="unsloth/Meta-Llama-3.1-8B-Instruct"
+        info "Downloading Llama-3.1-8B-Instruct (unsloth mirror, no token needed) → ${MODEL_DIR}/llama"
+    fi
     info "  This is ~16 GB — expect 5–20 minutes depending on bandwidth"
-    _hf_dl unsloth/Meta-Llama-3.1-8B-Instruct \
+    _hf_dl "${_LLAMA_REPO}" \
         --local-dir "${MODEL_DIR}/llama" \
         --local-dir-use-symlinks False
-    ok "Llama 3.1 8B Instruct downloaded"
+    ok "Llama 3.1 8B Instruct downloaded (${_LLAMA_REPO})"
 
     # ── Parakeet TDT 0.6B ─────────────────────────────────────────────────────
     info "Downloading Parakeet TDT (nvidia/parakeet-tdt-0.6b-v2) → ${MODEL_DIR}/parakeet"
