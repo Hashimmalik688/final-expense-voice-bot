@@ -17,6 +17,7 @@ from typing import AsyncIterator, Optional
 import numpy as np
 
 from config.settings import STTConfig, get_stt_config
+from src.stt.vad_handler import SileroVADHandler
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,8 @@ class ParakeetSTTHandler:
         self._min_chunk_s: float = 0.3
         # Maximum buffer before forcing a flush
         self._max_buffer_s: float = 10.0
+        # Silero VAD — loaded during initialize(); filters silence pre-STT
+        self._vad = SileroVADHandler(sample_rate=self._config.sample_rate)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -89,6 +92,12 @@ class ParakeetSTTHandler:
         except Exception:
             logger.exception("Failed to load Parakeet TDT model.")
             raise
+
+        # Load Silero VAD after the ASR model so GPU memory is settled
+        try:
+            self._vad.load()
+        except Exception:
+            logger.warning("Silero VAD failed to load — STT will run on all audio.", exc_info=True)
 
     async def shutdown(self) -> None:
         """Release model resources."""
@@ -123,6 +132,11 @@ class ParakeetSTTHandler:
             raise RuntimeError("Handler not initialised – call initialize() first.")
 
         async for chunk in audio_chunks:
+            # Skip chunks that are clearly silence — avoids buffering noise
+            # and reduces unnecessary STT inference calls by ~40 %.
+            if not self._vad.is_speech(chunk):
+                continue
+
             samples = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32768.0
             self._audio_buffer.append(samples)
             self._buffer_duration_s += len(samples) / self._config.sample_rate
@@ -170,6 +184,11 @@ class ParakeetSTTHandler:
         """Run the model on the current audio buffer."""
         start = time.perf_counter()
         waveform = np.concatenate(self._audio_buffer)
+
+        # Strip any residual silence from the buffered waveform before inference
+        filtered = self._vad.filter_speech(waveform)
+        if filtered is not None and len(filtered) > 0:
+            waveform = filtered
 
         try:
             # Offload blocking inference to a thread so the event loop stays free.

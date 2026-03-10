@@ -1,0 +1,34 @@
+# Git + cache
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+**/*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Logs and runtime data
+logs/
+*.log
+
+# Local env
+.env
+.env.local
+
+# Models (large binary blobs — mounted as a volume instead)
+models/
+*.bin
+*.safetensors
+*.gguf
+
+# Documentation
+README.md
+*.md
+
+# Dev tooling
+tests/
+scripts/
+
+# Frontend (built separately)
+frontend/

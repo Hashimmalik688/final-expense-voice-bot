@@ -1,0 +1,148 @@
+# =============================================================================
+# Final Expense Voice Bot — Docker Compose stack
+#
+# Services:
+#   redis          — session / pub-sub cache
+#   vllm           — Llama-3.1-8B-Instruct via official vLLM image
+#   cosyvoice      — CosyVoice 2 TTS REST server (built locally)
+#   voicebot       — main FastAPI application
+#   frontend       — Next.js monitoring dashboard
+#
+# Quick start:
+#   cp .env.example .env        # fill in SIP / VICIdial credentials
+#   docker compose up           # CPU / dev
+#
+# GPU production:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up
+#
+# Inspired by ShayneP/local-voice-ai's service-per-container approach with
+# proper health-check dependency ordering.
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Redis — lightweight session / pub-sub cache
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - voicebot_net
+
+  # ---------------------------------------------------------------------------
+  # vLLM — Llama-3.1-8B-Instruct served on an OpenAI-compatible REST API
+  # On first boot, downloads the model weights (~16 GB) to the models/ volume.
+  # ---------------------------------------------------------------------------
+  vllm:
+    image: vllm/vllm-openai:latest
+    restart: unless-stopped
+    command:
+      - --model
+      - "${LLM_MODEL:-unsloth/Meta-Llama-3.1-8B-Instruct}"
+      - --port
+      - "8000"
+      - --host
+      - "0.0.0.0"
+      - --max-model-len
+      - "${LLM_MAX_CTX:-8192}"
+    environment:
+      - HF_HOME=/models
+    volumes:
+      - models:/models
+    ports:
+      - "${VLLM_HOST_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 90s
+    networks:
+      - voicebot_net
+
+  # ---------------------------------------------------------------------------
+  # CosyVoice TTS server — built from inference/cosyvoice/Dockerfile
+  # ---------------------------------------------------------------------------
+  cosyvoice:
+    build:
+      context: ./inference/cosyvoice
+    restart: unless-stopped
+    environment:
+      - HF_HOME=/models
+      - COSYVOICE_MODEL=${COSYVOICE_MODEL:-FunAudioLLM/CosyVoice2-0.5B}
+    volumes:
+      - models:/models
+    ports:
+      - "${TTS_HOST_PORT:-8001}:8001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    networks:
+      - voicebot_net
+
+  # ---------------------------------------------------------------------------
+  # Voice bot — main FastAPI application
+  # ---------------------------------------------------------------------------
+  voicebot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override service URLs to use Docker internal hostnames
+      - VLLM_API_URL=http://vllm:8000/v1
+      - TTS_API_URL=http://cosyvoice:8001
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "${BOT_HOST_PORT:-9000}:9000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      vllm:
+        condition: service_healthy
+      cosyvoice:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - voicebot_net
+
+  # ---------------------------------------------------------------------------
+  # Frontend — Next.js monitoring dashboard
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:9000
+      - API_URL=http://voicebot:9000
+    ports:
+      - "${FRONTEND_HOST_PORT:-3000}:3000"
+    depends_on:
+      voicebot:
+        condition: service_healthy
+    networks:
+      - voicebot_net
+
+networks:
+  voicebot_net:
+    driver: bridge
+
+volumes:
+  models:
