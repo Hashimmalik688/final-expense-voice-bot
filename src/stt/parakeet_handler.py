@@ -171,12 +171,23 @@ class ParakeetSTTHandler:
         start = time.perf_counter()
         waveform = np.concatenate(self._audio_buffer)
 
-        # Offload blocking inference to a thread so the event loop stays free.
-        transcription = await asyncio.get_event_loop().run_in_executor(
-            None,
-            self._infer_sync,
-            waveform,
-        )
+        try:
+            # Offload blocking inference to a thread so the event loop stays free.
+            # Add timeout to prevent event loop stalling on stuck inference.
+            transcription = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(
+                    None,
+                    self._infer_sync,
+                    waveform,
+                ),
+                timeout=10.0  # 10-second max for STT inference
+            )
+        except asyncio.TimeoutError:
+            logger.error("STT inference timeout (>10s) – returning empty transcription")
+            transcription = ""
+        except Exception as exc:
+            logger.error("STT inference failed: %s", exc, exc_info=True)
+            transcription = ""
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         logger.debug(

@@ -46,6 +46,56 @@ logging.basicConfig(
 )
 logger = logging.getLogger("voicebot")
 
+
+# ---------------------------------------------------------------------------
+# Configuration validation
+# ---------------------------------------------------------------------------
+
+def _validate_required_config() -> None:
+    """Validate that all required environment variables are set before startup."""
+    cfg = get_config()
+    sip_cfg = get_sip_config()
+    vicidial_cfg = get_vicidial_config()
+    
+    issues = []
+    
+    # SIP configuration
+    if not sip_cfg.server or sip_cfg.server == "your_sip_server_here":
+        issues.append("SIP_SERVER not set (required for Twilio/Asterisk integration)")
+    if not sip_cfg.username or sip_cfg.username == "your_sip_username_here":
+        issues.append("SIP_USERNAME not set")
+    if not sip_cfg.password or sip_cfg.password == "your_sip_password_here":
+        issues.append("SIP_PASSWORD not set (required for SIP registration)")
+    
+    # VICIdial configuration
+    if not vicidial_cfg.api_user or vicidial_cfg.api_user == "your_vicidial_user_here":
+        issues.append("VICIDIAL_API_USER not set (required for call routing)")
+    if not vicidial_cfg.api_pass or vicidial_cfg.api_pass == "your_vicidial_pass_here":
+        issues.append("VICIDIAL_API_PASS not set (required for call routing)")
+    
+    # LLM/TTS/STT configuration
+    llm_cfg = get_llm_config()
+    if not llm_cfg.vllm_api_url or llm_cfg.vllm_api_url == "http://127.0.0.1:9999":
+        issues.append("VLLM_API_URL not set correctly (points to vLLM server)")
+    
+    tts_cfg = get_tts_config()
+    if not tts_cfg.api_url or tts_cfg.api_url == "http://127.0.0.1:9998":
+        issues.append("TTS_API_URL not set correctly (points to CosyVoice server)")
+    
+    if issues:
+        logger.error("=" * 60)
+        logger.error("CONFIGURATION VALIDATION FAILED:")
+        for issue in issues:
+            logger.error("  ✗ %s", issue)
+        logger.error("=" * 60)
+        raise RuntimeError(
+            f"Missing or invalid configuration ({len(issues)} issue(s)). "
+            f"Check .env file. See .env.example for required fields."
+        )
+    
+    logger.info("Configuration validation passed.")
+
+
 # ---------------------------------------------------------------------------
 # Component imports
 # ---------------------------------------------------------------------------
@@ -85,50 +135,98 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("  Final Expense Voice Bot – Starting")
     logger.info("=" * 60)
 
-    # -- Initialise components --
-    stt_handler = ParakeetSTTHandler(get_stt_config())
-    tts_handler = CosyVoiceTTSHandler(get_tts_config())
-    llm_client = MimoVLLMClient(get_llm_config())
-    rag_engine = RAGEngine(get_rag_config())
+    try:
+        # Validate configuration before initializing anything
+        _validate_required_config()
 
-    agent_api = AgentAPI(get_vicidial_config())
-    transfer_handler = TransferHandler(get_vicidial_config())
-    transfer_handler.set_agent_api(agent_api)
+        # -- Initialise components --
+        logger.info("Initializing STT handler (Parakeet TDT) …")
+        stt_handler = ParakeetSTTHandler(get_stt_config())
+        
+        logger.info("Initializing TTS handler (CosyVoice 2) …")
+        tts_handler = CosyVoiceTTSHandler(get_tts_config())
+        
+        logger.info("Initializing LLM client (vLLM OpenAI API) …")
+        llm_client = MimoVLLMClient(get_llm_config())
+        
+        logger.info("Initializing RAG engine …")
+        rag_engine = RAGEngine(get_rag_config())
 
-    sip_handler = SIPHandler(get_sip_config())
+        logger.info("Initializing VICIdial agent API …")
+        agent_api = AgentAPI(get_vicidial_config())
+        
+        logger.info("Initializing transfer handler …")
+        transfer_handler = TransferHandler(get_vicidial_config())
+        transfer_handler.set_agent_api(agent_api)
 
-    call_manager = CallManager(
-        stt=stt_handler,
-        tts=tts_handler,
-        llm_client=llm_client,
-        rag_engine=rag_engine,
-    )
+        logger.info("Initializing SIP handler …")
+        sip_handler = SIPHandler(get_sip_config())
 
-    # Load knowledge base and sales script
-    rag_engine.load()
-    await call_manager.initialize()
-    await agent_api.initialize()
+        logger.info("Initializing call manager …")
+        call_manager = CallManager(
+            stt=stt_handler,
+            tts=tts_handler,
+            llm_client=llm_client,
+            rag_engine=rag_engine,
+        )
 
-    # Register SIP
-    sip_ok = await sip_handler.register()
-    if sip_ok:
-        logger.info("SIP registered. Listening for calls.")
-    else:
-        logger.warning("SIP registration failed – running in API-only mode.")
+        # Load knowledge base and sales script
+        logger.info("Loading knowledge base and sales script …")
+        rag_engine.load()
+        
+        logger.info("Initializing subsystems …")
+        await call_manager.initialize()
+        await agent_api.initialize()
+        
+        # Health checks before accepting calls
+        logger.info("Running health checks …")
+        
+        llm_ok = await llm_client.health_check()
+        if not llm_ok:
+            raise RuntimeError(
+                f"vLLM server not reachable at {get_llm_config().vllm_api_url}. "
+                "Check that voicebot-vllm.service is running."
+            )
+        logger.info("  ✓ LLM server responds")
+        
+        tts_ok = await tts_handler.health_check()
+        if not tts_ok:
+            raise RuntimeError(
+                f"TTS server not reachable at {get_tts_config().api_url}. "
+                "Check that voicebot-tts.service is running."
+            )
+        logger.info("  ✓ TTS server responds")
 
-    # Wire incoming-call handler
-    sip_handler.on_incoming_call = _handle_incoming_sip_call
+        # Register SIP (hard stop if it fails)
+        logger.info("Registering with SIP server …")
+        sip_ok = await sip_handler.register()
+        if not sip_ok:
+            raise RuntimeError(
+                f"SIP registration failed. Check credentials: "
+                f"SIP_SERVER={get_sip_config().server}, "
+                f"SIP_USERNAME={get_sip_config().username}"
+            )
+        logger.info("  ✓ SIP registered. Listening for calls.")
 
-    logger.info("Voice bot ready. Management API at http://%s:%d", _cfg.api_host, _cfg.api_port)
+        # Wire incoming-call handler
+        sip_handler.on_incoming_call = _handle_incoming_sip_call
 
-    yield  # ------------- application runs here -------------
+        logger.info("=" * 60)
+        logger.info("Voice bot ready. Management API at http://%s:%d", _cfg.api_host, _cfg.api_port)
+        logger.info("=" * 60)
 
-    # -- Shutdown --
-    logger.info("Shutting down …")
-    await call_manager.shutdown()
-    await agent_api.shutdown()
-    await sip_handler.unregister()
-    logger.info("Shutdown complete.")
+        yield  # ------------- application runs here --------
+
+        # -- Shutdown --
+        logger.info("Shutting down …")
+        await call_manager.shutdown()
+        await agent_api.shutdown()
+        await sip_handler.unregister()
+        logger.info("Shutdown complete.")
+    
+    except Exception as exc:
+        logger.error("Fatal error during startup: %s", exc, exc_info=True)
+        raise
 
 
 app = FastAPI(

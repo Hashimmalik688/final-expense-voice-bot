@@ -9,6 +9,7 @@ engine can begin synthesising speech before the full response is ready.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from dataclasses import dataclass
@@ -159,12 +160,18 @@ class MimoVLLMClient:
                         data_str = decoded[len("data: "):]
                         if data_str == "[DONE]":
                             break
-                        import json
-                        chunk = json.loads(data_str)
-                        delta = chunk["choices"][0].get("delta", {})
-                        content = delta.get("content", "")
-                        if content:
-                            yield content
+                        try:
+                            chunk = json.loads(data_str)
+                            delta = chunk["choices"][0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                yield content
+                        except (json.JSONDecodeError, KeyError, IndexError) as exc:
+                            logger.error("Failed to parse vLLM chunk: %s", exc)
+                            continue
+            except aiohttp.ClientError:
+                logger.exception("vLLM streaming request failed.")
+                raise
             except Exception:
                 logger.exception("Streaming generation failed.")
                 raise

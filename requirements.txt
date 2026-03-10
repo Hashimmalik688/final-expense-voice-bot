@@ -27,17 +27,16 @@ pydantic>=2.9.0
 # --- Audio ---
 soundfile>=0.12.0
 
-# --- Audio I/O for voice pipeline test (test_voice_pipeline.py) ---
-# Install manually as needed:
-#   pip install sounddevice        — mic recording + speaker playback
-#   pip install faster-whisper     — CPU STT (Windows-friendly alternative to Parakeet)
-# sounddevice>=0.5.0
-# faster-whisper>=1.0.0
+# --- Semantic search / RAG embedding ---
+sentence-transformers>=2.7.0
 
-# --- NeMo ASR (Parakeet TDT) — install separately on GPU servers ---
-# nemo_toolkit[asr]>=2.0.0
-# torch>=2.4.0
-# torchaudio>=2.4.0
+# --- NeMo ASR (Parakeet TDT speech-to-text) —REQUIRED for STT —
+nemo_toolkit[asr]>=2.1.0
+
+# --- PyTorch (CUDA 12.1) —— REQUIRED for LLM, STT, TTS inference ---
+# Note: Installed separately via deploy script with CUDA index for perf
+# torch>=2.5.0
+# torchaudio>=2.5.0
 
 # --- Testing ---
 pytest>=8.0.0

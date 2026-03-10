@@ -85,6 +85,8 @@ class CosyVoiceTTSHandler:
 
     async def health_check(self) -> bool:
         """Return ``True`` if the TTS server is reachable."""
+        if not self._session or self._session.closed:
+            return False
         try:
             async with self._session.get(f"{self._base_url}/health") as resp:
                 return resp.status == 200
