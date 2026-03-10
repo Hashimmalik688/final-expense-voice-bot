@@ -3,7 +3,7 @@
 # scripts/deploy_gpu.sh
 # =============================================================================
 # One-command bare-metal deployment for the Final Expense Voice Bot on
-# Ubuntu 22.04 / 24.04 with an NVIDIA A100 40 GB GPU (Vast.ai or bare metal).
+# Ubuntu 22.04 / 24.04 with an NVIDIA RTX 3090 24 GB GPU (Vast.ai or bare metal).
 #
 # USAGE
 #   sudo bash scripts/deploy_gpu.sh [OPTIONS]
@@ -19,7 +19,7 @@
 #   --skip-services        Skip systemd unit file generation
 #   -y / --yes             Non-interactive; skip all prompts
 #
-# DISK REQUIREMENTS  (recommend at least 100 GB)
+# DISK REQUIREMENTS  (minimum 60 GB — 80 GB+ recommended)
 #   Llama 3.1 8B Instruct     ~16 GB
 #   Parakeet TDT 0.6B          ~1.2 GB
 #   CosyVoice2 0.5B            ~1.0 GB
@@ -28,13 +28,13 @@
 #   ─────────────────────────────────────
 #   Total                      ~47 GB
 #
-# GPU MEMORY BUDGET  (A100 40 GB)
-#   vLLM  — Llama-3.1-8B (bfloat16) ~16 GB (gpu_memory_utilization=0.42)
+# GPU MEMORY BUDGET  (RTX 3090 24 GB)
+#   vLLM  — Llama-3.1-8B (bfloat16) ~16 GB (gpu_memory_utilization=0.85)
 #   CosyVoice 2 (0.5B)             ~2 GB
 #   Parakeet TDT (0.6B, in-proc)   ~2 GB
-#   CUDA context + overhead        ~2 GB
+#   CUDA context + overhead        ~1 GB
 #   ───────────────────────────────────
-#   Total                         ~22 GB   (18 GB headroom remaining)
+#   Total                         ~21 GB   (3 GB headroom on 24 GB card)
 #
 # SERVICE ARCHITECTURE AFTER DEPLOYMENT
 #
@@ -136,7 +136,7 @@ echo ""
 echo -e "${BOLD}${CYAN}"
 echo "  ╔══════════════════════════════════════════════════════════╗"
 echo "  ║   Final Expense Voice Bot — GPU Deployment               ║"
-echo "  ║   Ubuntu 22.04 / 24.04  ·  NVIDIA A100 40 GB            ║"
+echo "  ║   Ubuntu 22.04 / 24.04  ·  NVIDIA RTX 3090 24 GB        ║"
 echo "  ╚══════════════════════════════════════════════════════════╝"
 echo -e "${RESET}"
 echo "  Project source : $PROJECT_SRC"
@@ -180,10 +180,10 @@ GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
 GPU_VRAM=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader | head -1)
 ok "GPU: ${GPU_NAME} (${GPU_VRAM})"
 
-# Disk space check — require at least 80 GB free
-FREE_GB=$(df "$MODEL_DIR" 2>/dev/null | tail -1 | awk '{print int($4/1024/1024)}' || df / | tail -1 | awk '{print int($4/1024/1024)}')
-if [[ "$FREE_GB" -lt 80 ]]; then
-    warn "Free disk space: ${FREE_GB} GB. Recommend at least 80 GB. Proceeding anyway."
+# Disk space check — require at least 50 GB free (models+envs need ~47 GB)
+FREE_GB=$(df / | tail -1 | awk '{print int($4/1024/1024)}')
+if [[ "$FREE_GB" -lt 50 ]]; then
+    warn "Free disk space: ${FREE_GB} GB. Need at least 50 GB. Proceeding anyway."
 else
     ok "Free disk space: ${FREE_GB} GB"
 fi
@@ -703,29 +703,20 @@ section "STEP 9/11  Environment file"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _ENV="${DEPLOY_DIR}/.env"
-if [[ ! -f "$_ENV" ]]; then
-    info "Generating .env from .env.example …"
-    cp "${DEPLOY_DIR}/.env.example" "$_ENV"
+[[ -f "$_ENV" ]] || die ".env not found at $_ENV — ensure .env is committed to the repo and rsync'd here."
 
-    # Point all model paths to the downloaded locations
-    _BOT_IP=$(hostname -I | awk '{print $1}')
-
-    # Use sed to patch the template values
-    sed -i "s|^SIP_LOCAL_IP=.*|SIP_LOCAL_IP=${_BOT_IP}|"                   "$_ENV"
-    sed -i "s|^LLM_MODEL=.*|LLM_MODEL=${MODEL_DIR}/llama|"                 "$_ENV"
-    sed -i "s|^VLLM_API_URL=.*|VLLM_API_URL=http://127.0.0.1:8000|"       "$_ENV"
-    sed -i "s|^STT_MODEL=.*|STT_MODEL=${MODEL_DIR}/parakeet|"              "$_ENV"
-    sed -i "s|^TTS_API_URL=.*|TTS_API_URL=http://127.0.0.1:8001|"         "$_ENV"
-    sed -i "s|^TTS_MODEL=.*|TTS_MODEL=${MODEL_DIR}/cosyvoice|"             "$_ENV"
-    sed -i "s|^RAG_EMBEDDING_MODEL=.*|RAG_EMBEDDING_MODEL=${MODEL_DIR}/minilm|" "$_ENV"
-    [[ -n "$HF_TOKEN" ]] && sed -i "s|^HF_TOKEN=.*|HF_TOKEN=${HF_TOKEN}|" "$_ENV"
-
-    chmod 600 "$_ENV"
-    ok ".env generated at $_ENV"
-    warn "Edit $_ENV to set VICIdial credentials and SIP password before going live."
-else
-    ok ".env already exists at $_ENV — skipping (delete to regenerate)"
-fi
+# Always patch model paths to locally downloaded locations and detected IP
+_BOT_IP=$(hostname -I | awk '{print $1}')
+sed -i "s|^SIP_LOCAL_IP=.*|SIP_LOCAL_IP=${_BOT_IP}|"                        "$_ENV"
+sed -i "s|^LLM_MODEL=.*|LLM_MODEL=${MODEL_DIR}/llama|"                      "$_ENV"
+sed -i "s|^VLLM_API_URL=.*|VLLM_API_URL=http://127.0.0.1:8000|"            "$_ENV"
+sed -i "s|^STT_MODEL=.*|STT_MODEL=${MODEL_DIR}/parakeet|"                   "$_ENV"
+sed -i "s|^TTS_API_URL=.*|TTS_API_URL=http://127.0.0.1:8001|"              "$_ENV"
+sed -i "s|^TTS_MODEL=.*|TTS_MODEL=${MODEL_DIR}/cosyvoice|"                  "$_ENV"
+sed -i "s|^RAG_EMBEDDING_MODEL=.*|RAG_EMBEDDING_MODEL=${MODEL_DIR}/minilm|" "$_ENV"
+[[ -n "$HF_TOKEN" ]] && sed -i "s|^HF_TOKEN=.*|HF_TOKEN=${HF_TOKEN}|"      "$_ENV"
+chmod 600 "$_ENV"
+ok ".env patched — local model paths + IP (${_BOT_IP}) applied"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -755,19 +746,20 @@ Environment=CUDA_VISIBLE_DEVICES=0
 Environment=TRANSFORMERS_OFFLINE=1
 Environment=HF_DATASETS_OFFLINE=1
 
-# A100 40 GB budget:
-#   gpu_memory_utilization=0.42 → vLLM uses ≤ 16.8 GB
-#   Max model context: 8192 tokens (longer = more KV cache VRAM)
-#   max-num-seqs=30 → 30 concurrent call legs maximum
+# RTX 3090 24 GB budget:
+#   Llama-3.1-8B in bfloat16 = ~16 GB weights
+#   gpu_memory_utilization=0.85 → vLLM uses ≤ 20.4 GB (~4.4 GB for KV cache)
+#   max-model-len=8192 is safe; voice calls rarely exceed 2k tokens
+#   max-num-seqs=4 → matches LLM_MAX_CONCURRENT=1 with headroom
 ExecStart=${VENV_VLLM}/bin/python -m vllm.entrypoints.openai.api_server \
     --model ${MODEL_DIR}/llama \
     --served-model-name Llama-3.1-8B-Instruct \
     --host 127.0.0.1 \
     --port 8000 \
     --dtype bfloat16 \
-    --gpu-memory-utilization 0.42 \
+    --gpu-memory-utilization 0.85 \
     --max-model-len 8192 \
-    --max-num-seqs 30 \
+    --max-num-seqs 4 \
     --disable-log-requests \
     --trust-remote-code
 
@@ -984,11 +976,11 @@ mkdir -p "$LOG_DIR"
 
 echo "[start_all] Starting vLLM …"
 nohup /opt/vllm-env/bin/python -m vllm.entrypoints.openai.api_server \
-    --model /opt/models/mimo \
-    --served-model-name MiMo-7B-RL \
+    --model /opt/models/llama \
+    --served-model-name Llama-3.1-8B-Instruct \
     --host 127.0.0.1 --port 8000 \
-    --dtype bfloat16 --gpu-memory-utilization 0.42 \
-    --max-model-len 8192 --max-num-seqs 30 \
+    --dtype bfloat16 --gpu-memory-utilization 0.85 \
+    --max-model-len 8192 --max-num-seqs 4 \
     --disable-log-requests --trust-remote-code \
     > "${LOG_DIR}/vllm.log" 2>&1 &
 echo $! > /tmp/voicebot-vllm.pid
@@ -1057,7 +1049,7 @@ echo "  ╚═══════════════════════
 echo -e "${RESET}"
 cat << INFO
   ── Services ───────────────────────────────────────────────────────
-  vLLM (Mimo v2 Flash)  :  http://127.0.0.1:8000/health
+  vLLM (Llama 3.1 8B)   :  http://127.0.0.1:8000/health
   CosyVoice 2 TTS       :  http://127.0.0.1:8001/health
   Voice Bot API         :  http://${_BOT_IP}:9000/health
   Redis                 :  127.0.0.1:6379
