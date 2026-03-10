@@ -18,7 +18,7 @@ from typing import Any, Optional
 import yaml
 
 from config.settings import AppConfig, get_config
-from src.llm.mimo_vllm import LLMResponse, MimoVLLMClient
+from src.llm.llm_client import LLMClient, LLMResponse
 from src.llm.rag_engine import RAGEngine
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ class ConversationEngine:
 
     def __init__(
         self,
-        llm_client: MimoVLLMClient,
+        llm_client: LLMClient,
         rag_engine: RAGEngine,
         config: Optional[AppConfig] = None,
     ) -> None:

@@ -17,7 +17,7 @@ from enum import Enum
 from typing import Any, AsyncIterator, Callable, Optional
 
 from config.settings import AppConfig, get_config
-from src.llm.mimo_vllm import MimoVLLMClient
+from src.llm.llm_client import LLMClient
 from src.llm.rag_engine import RAGEngine
 from src.orchestration.conversation_engine import (
     CallAction,
@@ -110,7 +110,7 @@ class CallManager:
         self,
         stt: ParakeetSTTHandler,
         tts: CosyVoiceTTSHandler,
-        llm_client: MimoVLLMClient,
+        llm_client: LLMClient,
         rag_engine: RAGEngine,
         config: Optional[AppConfig] = None,
     ) -> None:

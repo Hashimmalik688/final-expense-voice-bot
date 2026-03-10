@@ -99,7 +99,7 @@ def _validate_required_config() -> None:
 # ---------------------------------------------------------------------------
 # Component imports
 # ---------------------------------------------------------------------------
-from src.llm.mimo_vllm import MimoVLLMClient
+from src.llm.llm_client import LLMClient
 from src.llm.rag_engine import RAGEngine
 from src.orchestration.call_manager import CallManager
 from src.orchestration.transfer_handler import TransferHandler
@@ -113,7 +113,7 @@ from src.vicidial.sip_handler import SIPHandler
 # ---------------------------------------------------------------------------
 stt_handler: ParakeetSTTHandler | None = None
 tts_handler: CosyVoiceTTSHandler | None = None
-llm_client: MimoVLLMClient | None = None
+llm_client: LLMClient | None = None
 rag_engine: RAGEngine | None = None
 call_manager: CallManager | None = None
 sip_handler: SIPHandler | None = None
@@ -147,7 +147,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         tts_handler = CosyVoiceTTSHandler(get_tts_config())
         
         logger.info("Initializing LLM client (vLLM OpenAI API) …")
-        llm_client = MimoVLLMClient(get_llm_config())
+        llm_client = LLMClient(get_llm_config())
         
         logger.info("Initializing RAG engine …")
         rag_engine = RAGEngine(get_rag_config())

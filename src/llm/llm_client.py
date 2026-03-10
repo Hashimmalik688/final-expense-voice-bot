@@ -33,8 +33,8 @@ class LLMResponse:
     latency_ms: float
 
 
-class MimoVLLMClient:
-    """Async vLLM client for Llama-3.1-8B-Instruct (name kept for import compatibility).
+class LLMClient:
+    """Async vLLM client for Llama-3.1-8B-Instruct.
 
     The vLLM server exposes an **OpenAI-compatible** ``/v1/chat/completions``
     endpoint.  This client calls that endpoint with the system prompt,
@@ -42,7 +42,7 @@ class MimoVLLMClient:
 
     Usage::
 
-        client = MimoVLLMClient()
+        client = LLMClient()
         await client.initialize()
 
         response = await client.generate(
@@ -246,5 +246,3 @@ class MimoVLLMClient:
         return result
 
 
-# Alias so code can use either name
-LlamaVLLMClient = MimoVLLMClient
