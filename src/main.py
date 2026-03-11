@@ -20,8 +20,13 @@ import sys
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
+import audioop
+import base64
+import json
+
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
@@ -67,12 +72,12 @@ def _validate_required_config() -> None:
     if not sip_cfg.password or sip_cfg.password == "your_sip_password_here":
         issues.append("SIP_PASSWORD not set (required for SIP registration)")
     
-    # VICIdial configuration
+    # VICIdial configuration (warnings only — not required for Twilio-only testing)
     if not vicidial_cfg.api_user or vicidial_cfg.api_user == "your_vicidial_user_here":
-        issues.append("VICIDIAL_API_USER not set (required for call routing)")
+        logger.warning("VICIDIAL_API_USER not set — VICIdial call routing disabled")
     if not vicidial_cfg.api_pass or vicidial_cfg.api_pass == "your_vicidial_pass_here":
-        issues.append("VICIDIAL_API_PASS not set (required for call routing)")
-    
+        logger.warning("VICIDIAL_API_PASS not set — VICIdial call routing disabled")
+
     # LLM/TTS/STT configuration
     llm_cfg = get_llm_config()
     if not llm_cfg.vllm_api_url or llm_cfg.vllm_api_url == "http://127.0.0.1:9999":
@@ -197,19 +202,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
         logger.info("  ✓ TTS server responds")
 
-        # Register SIP (hard stop if it fails)
-        logger.info("Registering with SIP server …")
-        sip_ok = await sip_handler.register()
-        if not sip_ok:
-            raise RuntimeError(
-                f"SIP registration failed. Check credentials: "
-                f"SIP_SERVER={get_sip_config().server}, "
-                f"SIP_USERNAME={get_sip_config().username}"
-            )
-        logger.info("  ✓ SIP registered. Listening for calls.")
-
-        # Wire incoming-call handler
+        # Wire incoming-call handler BEFORE start() to avoid race condition
         sip_handler.on_incoming_call = _handle_incoming_sip_call
+
+        # Start SIP: sets event loop, registers, starts listener + monitor tasks
+        logger.info("Registering with SIP server …")
+        sip_ok = await sip_handler.start()
+        if not sip_ok:
+            logger.warning(
+                "SIP registration failed (SIP_SERVER=%s, SIP_USERNAME=%s). "
+                "Continuing without SIP — Twilio webhook flow will still work.",
+                get_sip_config().server, get_sip_config().username
+            )
+        else:
+            logger.info("  ✓ SIP registered. Listening for calls.")
 
         logger.info("=" * 60)
         logger.info("Voice bot ready. Management API at http://%s:%d", _cfg.api_host, _cfg.api_port)
@@ -221,7 +227,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("Shutting down …")
         await call_manager.shutdown()
         await agent_api.shutdown()
-        await sip_handler.unregister()
+        await sip_handler.stop()
         logger.info("Shutdown complete.")
     
     except Exception as exc:
@@ -272,6 +278,123 @@ async def _handle_incoming_sip_call(sip_call, audio_stream, send_audio) -> None:
 # ---------------------------------------------------------------------------
 # Management API endpoints
 # ---------------------------------------------------------------------------
+
+@app.post("/twilio/voice")
+async def twilio_voice_webhook(request: Request):
+    """TwiML webhook — Twilio calls this when (318) 610-9787 receives a call.
+    Returns TwiML that opens a Media Stream WebSocket so the bot handles audio
+    directly (STT → LLM → TTS) without needing a SIP registration."""
+    host = request.headers.get("host", "")
+    stream_url = f"wss://{host}/twilio/stream"
+    twiml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        "<Response>"
+        "<Connect>"
+        f'<Stream url="{stream_url}"/>'
+        "</Connect>"
+        "</Response>"
+    )
+    return Response(content=twiml, media_type="application/xml")
+
+
+@app.websocket("/twilio/stream")
+async def twilio_media_stream(ws: WebSocket):
+    """Twilio Media Streams WebSocket — real-time bidirectional audio bridge.
+
+    Twilio sends μ-law 8 kHz audio; we need PCM 16 kHz for Parakeet STT.
+    CosyVoice TTS produces PCM 22050 Hz; we encode to μ-law 8 kHz for Twilio.
+    """
+    await ws.accept()
+
+    # Queues for inbound (Twilio→STT) and outbound (TTS→Twilio) audio
+    inbound_q: asyncio.Queue = asyncio.Queue()
+    outbound_q: asyncio.Queue = asyncio.Queue()
+
+    stream_sid: str | None = None
+    call_id: str | None = None
+    tts_sr = get_tts_config().sample_rate  # default 22050
+
+    # audioop.ratecv state handles for sample-accurate incremental resampling
+    _in_state = None   # 8 kHz → 16 kHz
+    _out_state = None  # tts_sr → 8 kHz
+
+    async def _audio_source():
+        """Yield PCM 16 kHz frames for the STT handler."""
+        while True:
+            chunk = await inbound_q.get()
+            if chunk is None:
+                return
+            yield chunk
+
+    def _audio_sink(pcm_bytes: bytes) -> None:
+        """Receive PCM from TTS, convert and queue for sending to Twilio."""
+        nonlocal _out_state
+        resampled, _out_state = audioop.ratecv(
+            pcm_bytes, 2, 1, tts_sr, 8000, _out_state
+        )
+        mulaw = audioop.lin2ulaw(resampled, 2)
+        outbound_q.put_nowait(mulaw)
+
+    async def _outbound_sender():
+        """Drain the outbound queue and forward encoded audio to Twilio."""
+        while True:
+            mulaw = await outbound_q.get()
+            if mulaw is None:
+                break
+            payload = base64.b64encode(mulaw).decode("ascii")
+            await ws.send_text(
+                json.dumps(
+                    {"event": "media", "streamSid": stream_sid,
+                     "media": {"payload": payload}}
+                )
+            )
+
+    sender_task = asyncio.create_task(_outbound_sender())
+
+    try:
+        async for raw in ws.iter_text():
+            msg = json.loads(raw)
+            event = msg.get("event")
+
+            if event == "start":
+                stream_sid = msg["start"]["streamSid"]
+                call_sid = msg["start"].get("callSid", "unknown")
+                logger.info("Twilio stream started — callSid=%s streamSid=%s", call_sid, stream_sid)
+                lead_data = {"first_name": "there", "phone": call_sid}
+                if call_manager:
+                    call_id = await call_manager.start_call(
+                        lead_data=lead_data,
+                        audio_source=_audio_source(),
+                        audio_sink=_audio_sink,
+                    )
+
+            elif event == "media":
+                mulaw = base64.b64decode(msg["media"]["payload"])
+                pcm_8k = audioop.ulaw2lin(mulaw, 2)
+                pcm_16k, new_state = audioop.ratecv(
+                    pcm_8k, 2, 1, 8000, 16000, _in_state
+                )
+                _in_state = new_state
+                inbound_q.put_nowait(pcm_16k)
+
+            elif event == "stop":
+                logger.info("Twilio stream stopped — streamSid=%s", stream_sid)
+                break
+
+    except WebSocketDisconnect:
+        logger.info("Twilio WebSocket disconnected — streamSid=%s", stream_sid)
+    except Exception:
+        logger.exception("Error in Twilio media stream — streamSid=%s", stream_sid)
+    finally:
+        inbound_q.put_nowait(None)
+        outbound_q.put_nowait(None)
+        try:
+            await asyncio.wait_for(sender_task, timeout=2.0)
+        except (asyncio.TimeoutError, Exception):
+            sender_task.cancel()
+        if call_id and call_manager:
+            await call_manager.end_call(call_id, reason="completed")
+
 
 class StartCallRequest(BaseModel):
     lead_name: str = "there"

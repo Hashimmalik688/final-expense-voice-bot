@@ -61,7 +61,7 @@ class ParakeetSTTHandler:
         # Maximum buffer before forcing a flush
         self._max_buffer_s: float = 10.0
         # Silero VAD — loaded during initialize(); filters silence pre-STT
-        self._vad = SileroVADHandler(sample_rate=self._config.sample_rate)
+        self._vad = SileroVADHandler(sample_rate=self._config.sample_rate, threshold=0.35)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -79,13 +79,24 @@ class ParakeetSTTHandler:
         )
 
         try:
+            import torch
             import nemo.collections.asr as nemo_asr  # type: ignore[import-untyped]
 
-            self._model = nemo_asr.models.ASRModel.from_pretrained(
-                model_name=self._config.model_name,
-            )
-            if self._config.device == "cuda":
-                self._model = self._model.cuda()
+            device = torch.device(self._config.device)
+            model_name = self._config.model_name
+            if model_name.endswith(".nemo") or model_name.startswith("/"):
+                # Local .nemo file — use restore_from() instead of from_pretrained()
+                import os
+                abs_path = os.path.abspath(model_name)
+                logger.info("Loading from local .nemo file: %s on device %s", abs_path, device)
+                self._model = nemo_asr.models.ASRModel.restore_from(
+                    restore_path=abs_path, map_location=device
+                )
+            else:
+                self._model = nemo_asr.models.ASRModel.from_pretrained(
+                    model_name=model_name, map_location=device,
+                )
+            self._model = self._model.to(device)
             self._model.eval()
             self._is_initialized = True
             logger.info("Parakeet TDT model loaded successfully.")
@@ -126,31 +137,45 @@ class ParakeetSTTHandler:
         Yields
         ------
         TranscriptionResult
-            Partial and final transcription segments.
+            Final transcription segments (emitted after end-of-speech silence).
         """
         if not self._is_initialized:
             raise RuntimeError("Handler not initialised – call initialize() first.")
 
+        # End-of-speech detection: flush the buffer as final after this many
+        # seconds of silence following speech.
+        end_of_speech_s: float = 0.5
+        last_speech_time: float = 0.0
+
         async for chunk in audio_chunks:
-            # Skip chunks that are clearly silence — avoids buffering noise
-            # and reduces unnecessary STT inference calls by ~40 %.
-            if not self._vad.is_speech(chunk):
+            is_speech = self._vad.is_speech(chunk)
+
+            if is_speech:
+                last_speech_time = time.time()
+                samples = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32768.0
+                self._audio_buffer.append(samples)
+                self._buffer_duration_s += len(samples) / self._config.sample_rate
+            else:
+                # Silence: check whether end-of-speech threshold has been reached
+                if (
+                    self._buffer_duration_s >= self._min_chunk_s
+                    and last_speech_time > 0
+                    and (time.time() - last_speech_time) >= end_of_speech_s
+                ):
+                    result = await self._run_inference(is_final=True)
+                    if result and result.text.strip():
+                        yield result
+                    self._reset_buffer()
+                    last_speech_time = 0.0
                 continue
 
-            samples = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32768.0
-            self._audio_buffer.append(samples)
-            self._buffer_duration_s += len(samples) / self._config.sample_rate
-
-            if self._buffer_duration_s >= self._min_chunk_s:
-                result = await self._run_inference(is_final=False)
-                if result and result.text.strip():
-                    yield result
-
+            # Force-flush if the buffer is growing too large (avoids runaway memory)
             if self._buffer_duration_s >= self._max_buffer_s:
                 result = await self._run_inference(is_final=True)
                 if result and result.text.strip():
                     yield result
                 self._reset_buffer()
+                last_speech_time = 0.0
 
     async def transcribe_buffer(self, audio: bytes) -> TranscriptionResult:
         """One-shot transcription of a complete audio buffer.

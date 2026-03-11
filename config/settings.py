@@ -76,7 +76,7 @@ class VICIdialConfig:
 class STTConfig:
     """Parakeet TDT speech-to-text settings."""
 
-    model_name: str = field(default_factory=lambda: _env("STT_MODEL", "nvidia/parakeet-tdt-0.6b-v2"))
+    model_name: str = field(default_factory=lambda: _env("STT_MODEL", "nvidia/parakeet-tdt-0.6b-v3"))
     device: str = field(default_factory=lambda: _env("STT_DEVICE", "cuda"))
     sample_rate: int = field(default_factory=lambda: _env_int("STT_SAMPLE_RATE", 16000))
     chunk_duration_ms: int = field(default_factory=lambda: _env_int("STT_CHUNK_MS", 160))
@@ -104,7 +104,7 @@ class TTSConfig:
     model_name: str = field(default_factory=lambda: _env("TTS_MODEL", "CosyVoice2-0.5B"))
     api_url: str = field(default_factory=lambda: _env("TTS_API_URL", "http://127.0.0.1:8001"))
     voice_id: str = field(default_factory=lambda: _env("TTS_VOICE_ID", "friendly_female"))
-    sample_rate: int = field(default_factory=lambda: _env_int("TTS_SAMPLE_RATE", 22050))
+    sample_rate: int = field(default_factory=lambda: _env_int("TTS_SAMPLE_RATE", 24000))
     speed: float = field(default_factory=lambda: _env_float("TTS_SPEED", 1.0))
     streaming: bool = field(default_factory=lambda: _env_bool("TTS_STREAMING", True))
 

@@ -273,11 +273,14 @@ STAGE GOAL: {stage_goal}
 {rag_context}
 
 INSTRUCTIONS:
-- Respond in 1-3 sentences, spoken naturally as if on a phone call.
-- Do NOT use markdown, bullet points, or formatting — this will be spoken aloud.
-- Stay focused on the stage goal. If the prospect goes off-topic, gently redirect.
-- Use the prospect's name ({state.lead_name}) naturally but not every sentence.
-- If the prospect wants to be removed from the call list, comply immediately.
+- This is a real phone call. Speak exactly as a warm, natural human would — NOT like a script being read.
+- Keep your reply SHORT: 1-2 sentences max. Short answers feel more human on a phone call.
+- NEVER start your reply with "Certainly", "Absolutely", "Of course", "Great question", or similar filler.
+- Do NOT use markdown, lists, or any formatting — pure spoken words only.
+- Mirror the prospect's pacing. If they gave a short answer, give a short reply.
+- Use the prospect's name ({state.lead_name}) at most once per reply, and only when it feels natural.
+- If the prospect wants to be removed from the call list, comply warmly and immediately.
+- Do not repeat information you already said in the conversation.
 """
         return prompt.strip()
 

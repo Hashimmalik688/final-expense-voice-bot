@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -258,13 +259,11 @@ class CallManager:
                 if not result.is_final:
                     continue
 
-                # Process the turn
-                turn = await self._engine.process_turn(session.state, result.text)
+                # Process the turn using streaming LLM → sentence-level TTS
+                # This starts playing audio before the full LLM response is done.
+                turn = await self._process_turn_streamed(session, result.text)
                 session.metrics.total_turns += 1
                 session.metrics.llm_latency_ms.append(turn.latency_ms)
-
-                # Speak the response
-                await self._speak(session, turn.bot_text)
 
                 # Handle actions
                 if turn.action == CallAction.TRANSFER_TO_CLOSER:
@@ -293,6 +292,66 @@ class CallManager:
         finally:
             if session.call_id in self._active_calls:
                 await self.end_call(session.call_id, reason=session.status.value)
+
+    async def _process_turn_streamed(self, session: _CallSession, prospect_text: str) -> "TurnResult":
+        """Stream LLM tokens, TTS each sentence as it completes (lowest latency)."""
+        from src.llm.rag_engine import RAGEngine
+        start = time.perf_counter()
+        state = session.state
+        state.turn_count += 1
+        state.history.append({"role": "user", "content": prospect_text})
+
+        rag_chunks = self._rag.retrieve(prospect_text)
+        rag_context = RAGEngine.format_context(rag_chunks)
+        system_prompt = self._engine._build_system_prompt(state, rag_context)
+
+        buf = ""
+        full_response = ""
+        # sentence boundary: end of .  !  ?  or ...  followed by space/end
+        _sent = re.compile(r'(?<=[.!?])(?:\s|$)')
+
+        try:
+            async for token in self._llm.generate_stream(
+                system_prompt=system_prompt, messages=state.history
+            ):
+                buf += token
+                full_response += token
+                # flush complete sentences as soon as we see a boundary
+                while True:
+                    m = _sent.search(buf)
+                    if not m:
+                        break
+                    sentence = buf[:m.end()].strip()
+                    buf = buf[m.end():]
+                    if sentence:
+                        await self._speak(session, sentence)
+        except Exception:
+            logger.exception("Streaming LLM failed on call %s – falling back", session.call_id)
+            # fallback: generate non-streaming
+            from src.orchestration.conversation_engine import TurnResult, CallAction
+            turn = await self._engine.process_turn(state, prospect_text)
+            # undo the duplicate history append
+            state.history.pop()  # remove the user message we added
+            state.history.pop()  # remove it from process_turn too
+            return turn
+
+        # flush any remaining text
+        if buf.strip():
+            await self._speak(session, buf.strip())
+
+        # finalize state
+        action = self._engine._resolve_action(state, prospect_text, full_response)
+        self._engine._advance_stage(state, prospect_text, full_response)
+        state.history.append({"role": "assistant", "content": full_response})
+
+        from src.orchestration.conversation_engine import TurnResult
+        return TurnResult(
+            bot_text=full_response,
+            action=action,
+            current_stage=state.current_stage,
+            latency_ms=(time.perf_counter() - start) * 1000,
+            rag_chunks_used=len(rag_chunks),
+        )
 
     async def _speak(self, session: _CallSession, text: str) -> None:
         """Synthesise *text* and send audio to the SIP channel."""

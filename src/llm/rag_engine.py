@@ -474,7 +474,7 @@ class RAGEngine:
         """
         if self._model is None:
             logger.info("Loading sentence-transformers model '%s' …", self._model_name)
-            self._model = SentenceTransformer(self._model_name)
+            self._model = SentenceTransformer(self._model_name, device="cpu")
             logger.info("Model loaded.")
 
         # Embed  "question + answer"  concatenation for each entry.
