@@ -84,22 +84,29 @@ class ParakeetSTTHandler:
 
             device = torch.device(self._config.device)
             model_name = self._config.model_name
+            # Always load weights to CPU first, then convert to FP16 before
+            # moving to CUDA — avoids a 3 GB FP32 spike that exhausts VRAM.
+            cpu_device = torch.device("cpu")
             if model_name.endswith(".nemo") or model_name.startswith("/"):
                 # Local .nemo file — use restore_from() instead of from_pretrained()
                 import os
                 abs_path = os.path.abspath(model_name)
-                logger.info("Loading from local .nemo file: %s on device %s", abs_path, device)
+                logger.info("Loading from local .nemo file: %s → cpu → %s", abs_path, device)
                 self._model = nemo_asr.models.ASRModel.restore_from(
-                    restore_path=abs_path, map_location=device
+                    restore_path=abs_path, map_location=cpu_device
                 )
             else:
                 self._model = nemo_asr.models.ASRModel.from_pretrained(
-                    model_name=model_name, map_location=device,
+                    model_name=model_name, map_location=cpu_device,
                 )
+            # Use FP16 on CUDA to halve VRAM (1.5 GB vs 3 GB), keeping FP32 on CPU
+            if str(device) != "cpu":
+                self._model = self._model.half()
             self._model = self._model.to(device)
             self._model.eval()
             self._is_initialized = True
-            logger.info("Parakeet TDT model loaded successfully.")
+            logger.info("Parakeet TDT model loaded successfully (device=%s, dtype=%s).",
+                        device, next(self._model.parameters()).dtype)
         except Exception:
             logger.exception("Failed to load Parakeet TDT model.")
             raise
