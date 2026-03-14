@@ -18,6 +18,7 @@ Install::
 from __future__ import annotations
 
 import logging
+import os
 from typing import Optional
 
 import numpy as np
@@ -50,9 +51,11 @@ class SileroVADHandler:
     def __init__(
         self,
         sample_rate: int = 16_000,
-        threshold: float = 0.5,
-        min_speech_ms: int = 250,
-        min_silence_ms: int = 100,
+        threshold: float = float(os.environ.get("VAD_THRESHOLD", "0.35")),
+        min_speech_ms: int = int(os.environ.get("VAD_MIN_SPEECH_MS", "200")),
+        min_silence_ms: int = int(os.environ.get("VAD_MIN_SILENCE_MS", "300")),
+        energy_threshold: float = float(os.environ.get("VAD_ENERGY_THRESHOLD", "0.002")),
+        min_speech_duration_ms: int = int(os.environ.get("VAD_MIN_SPEECH_DURATION_MS", "150")),
     ) -> None:
         """
         Parameters
@@ -64,16 +67,30 @@ class SileroVADHandler:
             0.5 is the recommended default (Silero documentation).
         min_speech_ms:
             Minimum duration (ms) to constitute a speech segment when
-            calling ``filter_speech()``.
+            calling ``filter_speech()``.  Raised to 400 ms to ignore
+            short non-speech sounds (coughs, background TV, etc.).
         min_silence_ms:
             Minimum silence gap (ms) between speech segments.
+        energy_threshold:
+            RMS energy gate.  Frames quieter than this (< 0.003 ≈ -50 dBFS)
+            are classified as silence regardless of Silero's VAD output.
+            This rejects distant background voices and low-level noise.
+        min_speech_duration_ms:
+            Minimum sustained speech duration (ms) before ``is_speech()``
+            returns True.  Short bursts (< 300 ms) such as mouth clicks,
+            coughs, and background pops are rejected.
         """
         self._sample_rate = sample_rate
         self._threshold = threshold
         self._min_speech_ms = min_speech_ms
         self._min_silence_ms = min_silence_ms
+        self._energy_threshold = energy_threshold
+        self._min_speech_duration_ms = min_speech_duration_ms
         self._model = None
         self._available: bool = False
+        # Track sustained speech duration for the min-duration gate
+        self._speech_onset_ms: float = 0.0
+        self._is_in_speech: bool = False
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -108,6 +125,9 @@ class SileroVADHandler:
         arrives from the SIP channel.  It is fast enough to run synchronously
         in the receive loop.
 
+        A minimum-duration gate (default 300 ms) ensures that short bursts
+        (mouth clicks, coughs) are not classified as speech.
+
         Parameters
         ----------
         audio_chunk:
@@ -117,6 +137,7 @@ class SileroVADHandler:
             return True  # fail open
 
         import torch  # type: ignore[import-untyped]
+        import time
 
         if isinstance(audio_chunk, (bytes, bytearray)):
             samples = (
@@ -129,14 +150,47 @@ class SileroVADHandler:
         if samples.size == 0:
             return False
 
+        # Energy gate: reject frames that are too quiet to be foreground speech.
+        rms = float(np.sqrt(np.mean(samples ** 2)))
+        if rms < self._energy_threshold:
+            self._is_in_speech = False
+            self._speech_onset_ms = 0.0
+            return False
+
         tensor = torch.from_numpy(samples).unsqueeze(0)
         try:
             with torch.no_grad():
                 confidence: float = self._model(tensor, self._sample_rate).item()
-            return confidence >= self._threshold
         except Exception:
             logger.debug("VAD inference error — passing audio through.", exc_info=True)
             return True  # fail open
+
+        if confidence >= self._threshold:
+            now_ms = time.monotonic() * 1000
+            if not self._is_in_speech:
+                self._is_in_speech = True
+                self._speech_onset_ms = now_ms
+            # Enforce minimum speech duration gate
+            elapsed_ms = now_ms - self._speech_onset_ms
+            if elapsed_ms < self._min_speech_duration_ms:
+                logger.debug(
+                    "[VAD] prob=%.3f energy=%.4f duration_ms=%.0f result=False(too-short)",
+                    confidence, rms, elapsed_ms,
+                )
+                return False  # too short — wait for more sustained speech
+            logger.debug(
+                "[VAD] prob=%.3f energy=%.4f duration_ms=%.0f result=True",
+                confidence, rms, elapsed_ms,
+            )
+            return True
+        else:
+            self._is_in_speech = False
+            self._speech_onset_ms = 0.0
+            logger.debug(
+                "[VAD] prob=%.3f energy=%.4f result=False(low-prob)",
+                confidence, rms,
+            )
+            return False
 
     # ------------------------------------------------------------------
     # Full-utterance silence stripping

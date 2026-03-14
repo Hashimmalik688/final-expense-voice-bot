@@ -190,13 +190,19 @@ class LLMClient:
         max_tokens: int,
     ) -> dict:
         full_messages = [{"role": "system", "content": system_prompt}] + messages
+        # Hard-cap at 60 tokens: shorter = faster TTS dispatch + more natural
+        # phone-call cadence (2 sentences ≈ 30–50 tokens for Llama-3.1-8B).
+        capped_tokens = min(max_tokens, 60)
         return {
             "model": self._config.model_name,
             "messages": full_messages,
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            "max_tokens": capped_tokens,
             "top_p": self._config.top_p,
             "stream": stream,
+            # Stop at any of these tokens so the model cannot produce multi-turn
+            # hallucinations or role-play its way past the reply boundary.
+            "stop": ["\n", "Human:", "Caller:", "User:", "Assistant:"],
         }
 
     async def _call_chat(

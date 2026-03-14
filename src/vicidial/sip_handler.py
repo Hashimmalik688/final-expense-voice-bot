@@ -101,7 +101,7 @@ REQUIRED PYTHON PACKAGES
 AUDIO FORMAT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   • RTP codec : G.711 µ-law (PCMU) — 8 kHz, 8-bit, mono
-  • Bot needs : PCM-16 LE @ 16 kHz (Parakeet STT) and 22 050 Hz (CosyVoice)
+  • Bot needs : PCM-16 LE @ 16 kHz (Parakeet STT) and 24 kHz (Kokoro TTS)
   • Resampling: scipy.signal.resample or audioop are used inline
   • Frame size : 160 samples per RTP packet (20 ms at 8 kHz)
 """
@@ -118,6 +118,9 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import AsyncIterator, Callable, Optional
 
+import numpy as np
+from scipy.signal import resample_poly
+
 from config.settings import SIPConfig, get_sip_config
 
 logger = logging.getLogger(__name__)
@@ -125,7 +128,7 @@ logger = logging.getLogger(__name__)
 # ── audio constants ────────────────────────────────────────────────────────────
 RTP_SAMPLE_RATE   = 8_000        # G.711 over RTP
 STT_SAMPLE_RATE   = 16_000       # Parakeet TDT input
-TTS_SAMPLE_RATE   = 22_050       # CosyVoice 2 output
+TTS_SAMPLE_RATE   = 24_000       # Kokoro TTS output (24 kHz)
 FRAME_SAMPLES     = 160          # 20 ms per RTP packet @ 8 kHz
 FRAME_BYTES_ULAW  = FRAME_SAMPLES          # 1 byte per µ-law sample
 FRAME_BYTES_PCM16 = FRAME_SAMPLES * 2      # 2 bytes per 16-bit sample
@@ -217,7 +220,10 @@ class AudioBridge:
         if not self._active.is_set() or self._loop is None or self._inbound is None:
             return
         pcm8 = audioop.ulaw2lin(ulaw_frame, 2)              # µ-law → PCM-16 @8 kHz
-        pcm16 = audioop.ratecv(pcm8, 2, 1, RTP_SAMPLE_RATE, STT_SAMPLE_RATE, None)[0]  # type: ignore
+        # Upsample 8 → 16 kHz with anti-aliased polyphase FIR
+        samples = np.frombuffer(pcm8, dtype=np.int16).astype(np.float32) / 32768.0
+        samples_16k = resample_poly(samples, 2, 1)
+        pcm16 = (samples_16k * 32768.0).clip(-32768, 32767).astype(np.int16).tobytes()
         try:
             self._loop.call_soon_threadsafe(
                 self._inbound.put_nowait, pcm16
@@ -245,7 +251,10 @@ class AudioBridge:
         """
         if not self._active.is_set():
             return
-        pcm8 = audioop.ratecv(pcm_tts, 2, 1, TTS_SAMPLE_RATE, RTP_SAMPLE_RATE, None)[0]  # type: ignore
+        # Downsample TTS rate → 8 kHz with anti-aliased polyphase FIR
+        samples = np.frombuffer(pcm_tts, dtype=np.int16).astype(np.float32) / 32768.0
+        samples_8k = resample_poly(samples, RTP_SAMPLE_RATE, TTS_SAMPLE_RATE)
+        pcm8 = (samples_8k * 32768.0).clip(-32768, 32767).astype(np.int16).tobytes()
         ulaw = audioop.lin2ulaw(pcm8, 2)
         # Split into RTP-sized frames
         for offset in range(0, len(ulaw), FRAME_BYTES_ULAW):
@@ -709,8 +718,6 @@ class SIPHandler:
             logger.exception("SIP REFER failed for call %s → %s", call_id, refer_to)
             call.state = SIPCallState.CONNECTED   # roll back state
             return False
-
-        return False  # unreachable in simulation, but satisfies type checker
 
     # ─────────────────────────────────────────────────────────────────────
     # Warm transfer  (hold + bridge + REFER)

@@ -1,0 +1,47 @@
+# /etc/systemd/system/ngrok-voicebot.service
+#
+# Keeps the ngrok tunnel alive and auto-restarts on crash / reboot.
+# After each restart it rewrites PUBLIC_URL in the bot's .env file.
+#
+# Install:
+#   sudo cp scripts/ngrok.service /etc/systemd/system/ngrok-voicebot.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ngrok-voicebot
+#
+# Check URL after (re)start:
+#   grep PUBLIC_URL /workspace/final-expense-voice-bot/.env
+#   journalctl -u ngrok-voicebot -f
+
+[Unit]
+Description=ngrok tunnel – Final Expense Voice Bot (port 9000)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Restart=on-failure
+RestartSec=5s
+
+# Authtoken is already stored at /root/.config/ngrok/ngrok.yml
+# To use a free static domain, add:  --domain=your-name.ngrok-free.app
+ExecStart=/usr/bin/ngrok http 9000 --log=stdout --log-format=json
+
+# After the tunnel starts, write the URL into .env
+ExecStartPost=/bin/bash -c '\
+  for i in $(seq 1 20); do \
+    URL=$(grep -o "\"url\":\"https://[^\"]*\"" /tmp/ngrok.log 2>/dev/null | tail -1 | sed "s/\"url\":\"//;s/\"//"); \
+    [ -n "$URL" ] && break; sleep 0.5; \
+  done; \
+  [ -n "$URL" ] && \
+    (grep -q "^PUBLIC_URL=" /workspace/final-expense-voice-bot/.env 2>/dev/null \
+     && sed -i "s|^PUBLIC_URL=.*|PUBLIC_URL=$URL|" /workspace/final-expense-voice-bot/.env \
+     || echo "PUBLIC_URL=$URL" >> /workspace/final-expense-voice-bot/.env) \
+  || true'
+
+StandardOutput=file:/tmp/ngrok.log
+StandardError=journal
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

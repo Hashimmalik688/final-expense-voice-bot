@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import signal
 import sys
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
@@ -23,6 +22,10 @@ from typing import AsyncIterator
 import audioop
 import base64
 import json
+from math import gcd
+
+import numpy as np
+from scipy.signal import resample_poly
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -64,13 +67,13 @@ def _validate_required_config() -> None:
     
     issues = []
     
-    # SIP configuration
+    # SIP configuration — warnings only; bot runs in Twilio-only mode without SIP
     if not sip_cfg.server or sip_cfg.server == "your_sip_server_here":
-        issues.append("SIP_SERVER not set (required for Twilio/Asterisk integration)")
+        logger.warning("SIP_SERVER not set — SIP/Asterisk integration disabled (Twilio-only mode)")
     if not sip_cfg.username or sip_cfg.username == "your_sip_username_here":
-        issues.append("SIP_USERNAME not set")
+        logger.warning("SIP_USERNAME not set — SIP integration disabled")
     if not sip_cfg.password or sip_cfg.password == "your_sip_password_here":
-        issues.append("SIP_PASSWORD not set (required for SIP registration)")
+        logger.warning("SIP_PASSWORD not set — SIP integration disabled (Twilio-only mode)")
     
     # VICIdial configuration (warnings only — not required for Twilio-only testing)
     if not vicidial_cfg.api_user or vicidial_cfg.api_user == "your_vicidial_user_here":
@@ -78,14 +81,19 @@ def _validate_required_config() -> None:
     if not vicidial_cfg.api_pass or vicidial_cfg.api_pass == "your_vicidial_pass_here":
         logger.warning("VICIDIAL_API_PASS not set — VICIdial call routing disabled")
 
-    # LLM/TTS/STT configuration
+    # LLM/TTS/STT configuration (hard errors — bot cannot run without these)
     llm_cfg = get_llm_config()
     if not llm_cfg.vllm_api_url or llm_cfg.vllm_api_url == "http://127.0.0.1:9999":
         issues.append("VLLM_API_URL not set correctly (points to vLLM server)")
     
     tts_cfg = get_tts_config()
-    if not tts_cfg.api_url or tts_cfg.api_url == "http://127.0.0.1:9998":
-        issues.append("TTS_API_URL not set correctly (points to CosyVoice server)")
+    if not tts_cfg.api_url:
+        issues.append("TTS_API_URL is empty — must point to the Kokoro TTS server (e.g. http://127.0.0.1:8001)")
+    elif tts_cfg.api_url in ("http://127.0.0.1:9998", "http://127.0.0.1:9000", "http://0.0.0.0:9000"):
+        issues.append(
+            f"TTS_API_URL={tts_cfg.api_url} is pointing at THE VOICEBOT ITSELF, not Kokoro. "
+            "Set TTS_API_URL=http://127.0.0.1:8001 in .env"
+        )
     
     if issues:
         logger.error("=" * 60)
@@ -109,7 +117,7 @@ from src.llm.rag_engine import RAGEngine
 from src.orchestration.call_manager import CallManager
 from src.orchestration.transfer_handler import TransferHandler
 from src.stt.parakeet_handler import ParakeetSTTHandler
-from src.tts.cosyvoice_handler import CosyVoiceTTSHandler
+from src.tts.kokoro_handler import KokoroTTSHandler
 from src.vicidial.agent_api import AgentAPI
 from src.vicidial.sip_handler import SIPHandler
 
@@ -117,7 +125,7 @@ from src.vicidial.sip_handler import SIPHandler
 # Shared instances (populated during lifespan)
 # ---------------------------------------------------------------------------
 stt_handler: ParakeetSTTHandler | None = None
-tts_handler: CosyVoiceTTSHandler | None = None
+tts_handler: KokoroTTSHandler | None = None
 llm_client: LLMClient | None = None
 rag_engine: RAGEngine | None = None
 call_manager: CallManager | None = None
@@ -148,8 +156,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("Initializing STT handler (Parakeet TDT) …")
         stt_handler = ParakeetSTTHandler(get_stt_config())
         
-        logger.info("Initializing TTS handler (CosyVoice 2) …")
-        tts_handler = CosyVoiceTTSHandler(get_tts_config())
+        logger.info("Initializing TTS handler (Kokoro) …")
+        tts_handler = KokoroTTSHandler(get_tts_config())
         
         logger.info("Initializing LLM client (vLLM OpenAI API) …")
         llm_client = LLMClient(get_llm_config())
@@ -301,8 +309,9 @@ async def twilio_voice_webhook(request: Request):
 async def twilio_media_stream(ws: WebSocket):
     """Twilio Media Streams WebSocket — real-time bidirectional audio bridge.
 
-    Twilio sends μ-law 8 kHz audio; we need PCM 16 kHz for Parakeet STT.
-    CosyVoice TTS produces PCM 22050 Hz; we encode to μ-law 8 kHz for Twilio.
+    Twilio sends μ-law 8 kHz audio; we resample to PCM 16 kHz for Parakeet STT.
+    Kokoro TTS produces PCM 24 kHz; we resample to μ-law 8 kHz for Twilio.
+    Both directions use scipy.signal.resample_poly for anti-aliased resampling.
     """
     await ws.accept()
 
@@ -312,11 +321,23 @@ async def twilio_media_stream(ws: WebSocket):
 
     stream_sid: str | None = None
     call_id: str | None = None
-    tts_sr = get_tts_config().sample_rate  # default 22050
+    tts_sr = get_tts_config().sample_rate   # 24 000 Hz
 
-    # audioop.ratecv state handles for sample-accurate incremental resampling
-    _in_state = None   # 8 kHz → 16 kHz
-    _out_state = None  # tts_sr → 8 kHz
+    # Pre-compute resample ratios for the outbound direction so we
+    # don't call gcd() on every audio chunk.
+    # Kokoro outputs 24 kHz → Twilio expects μ-law 8 kHz.
+    # gcd(24000, 8000) = 8000  →  up=1, down=3.
+    _out_g    = gcd(tts_sr, 8000)
+    _out_up   = 8000 // _out_g    # = 1  (for 24 000 → 8 000)
+    _out_down = tts_sr // _out_g  # = 3
+
+    # 80 ms of μ-law silence at 8 kHz (0x7F = silence in μ-law).
+    # Injected after each sentence to prevent polyphase FIR boundary
+    # ringing from being audible at sentence transitions.
+    _SILENCE_80MS = bytes([0x7F] * 640)
+
+    # Per-stream sentence counter (for mark events).
+    _sentence_seq: list[int] = [0]
 
     async def _audio_source():
         """Yield PCM 16 kHz frames for the STT handler."""
@@ -327,32 +348,104 @@ async def twilio_media_stream(ws: WebSocket):
             yield chunk
 
     def _audio_sink(pcm_bytes: bytes) -> None:
-        """Receive PCM from TTS, convert and queue for sending to Twilio."""
-        nonlocal _out_state
-        resampled, _out_state = audioop.ratecv(
-            pcm_bytes, 2, 1, tts_sr, 8000, _out_state
-        )
-        mulaw = audioop.lin2ulaw(resampled, 2)
+        """Receive PCM-16 from TTS (at tts_sr), downsample to 8 kHz μ-law, queue.
+
+        Each call corresponds to one sentence from the TTS engine.
+
+        FIX B — explicit float32 clip: prevents wrap-around distortion if any
+                 sample exceeds ±1.0 before int16 conversion.
+        FIX C — 80 ms μ-law silence appended after every sentence chunk so
+                 Twilio has a gap between sentences instead of directly
+                 concatenating them; eliminates boundary pops from the polyphase
+                 FIR filter settling transient.
+        FIX E — Twilio "mark" event after each sentence so barge-in detection
+                 and upstream logic know precisely when each sentence ends.
+        """
+        # FIX A: 24 kHz → 8 kHz at ratio 1:3 (verified correct for Kokoro 0.9.4)
+        samples = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+
+        # FIX B: hard-clip float32 to [-1, 1] before int16 conversion.
+        # resample_poly can introduce slight overshoot; clipping here prevents
+        # the wrap-around aliasing that produces the alien-noise symptom.
+        samples = np.clip(samples, -1.0, 1.0)
+
+        samples_8k = resample_poly(samples, _out_up, _out_down)
+
+        # Post-resample fade: smooth the polyphase FIR startup/settling
+        # transient (≈60 taps / 8 kHz ≈ 7.5 ms) that causes boundary pops
+        # when short sentence chunks are resampled independently.
+        n = len(samples_8k)
+        if n > 320:
+            fi = min(80, n // 8)   # ≤10 ms fade-in  @ 8 kHz
+            fo = min(80, n // 8)   # ≤10 ms fade-out @ 8 kHz
+            samples_8k = samples_8k.copy()
+            samples_8k[:fi]  *= np.linspace(0.0, 1.0, fi)
+            samples_8k[-fo:] *= np.linspace(1.0, 0.0, fo)
+
+        pcm_8k = (samples_8k * 32768.0).clip(-32768, 32767).astype(np.int16).tobytes()
+        mulaw = audioop.lin2ulaw(pcm_8k, 2)
+
+        # Enqueue audio, then FIX C silence, then FIX E mark.
         outbound_q.put_nowait(mulaw)
+        outbound_q.put_nowait(_SILENCE_80MS)
+        _sentence_seq[0] += 1
+        outbound_q.put_nowait({"event": "mark", "seq": _sentence_seq[0]})
+
+    def _filler_sink(mulaw_bytes: bytes) -> None:
+        """Direct μ-law bypass for pre-rendered filler clips.
+
+        Filler clips are stored as 8 kHz μ-law bytes.  They must NOT go
+        through _audio_sink (which expects 24 kHz int16 PCM) — doing so
+        treats every two μ-law bytes as one int16 sample, resamples at the
+        wrong ratio and re-encodes, producing the 'alien/tic-tic-tic' noise.
+        Putting bytes directly into outbound_q skips the resample/encode path.
+        """
+        outbound_q.put_nowait(mulaw_bytes)
 
     async def _outbound_sender():
-        """Drain the outbound queue and forward encoded audio to Twilio."""
+        """Drain the outbound queue and forward audio + marks to Twilio.
+
+        FIX D: every audio payload is base64-encoded inside the Twilio
+               Media Streams JSON envelope — no raw bytes ever sent directly.
+        FIX E: mark events are forwarded as Twilio mark messages.
+        """
         while True:
-            mulaw = await outbound_q.get()
-            if mulaw is None:
+            item = await outbound_q.get()
+            if item is None:
                 break
-            payload = base64.b64encode(mulaw).decode("ascii")
-            await ws.send_text(
-                json.dumps(
-                    {"event": "media", "streamSid": stream_sid,
-                     "media": {"payload": payload}}
-                )
-            )
+            if isinstance(item, dict):
+                # FIX E — Twilio mark event.
+                await ws.send_text(json.dumps({
+                    "event": "mark",
+                    "streamSid": stream_sid,
+                    "mark": {"name": f"sentence_{item['seq']}"},
+                }))
+            else:
+                # FIX D — audio payload correctly base64-encoded in envelope.
+                payload = base64.b64encode(item).decode("ascii")
+                await ws.send_text(json.dumps({
+                    "event": "media",
+                    "streamSid": stream_sid,
+                    "media": {"payload": payload},
+                }))
 
     sender_task = asyncio.create_task(_outbound_sender())
+    call_ended_event: asyncio.Event | None = None
+    _chunk_count: list[int] = [0]   # diagnostic: count inbound media chunks
 
     try:
-        async for raw in ws.iter_text():
+        while True:
+            # Use a short timeout so we can detect when the call ends and
+            # close the WebSocket, rather than waiting forever for Twilio.
+            try:
+                raw = await asyncio.wait_for(ws.receive_text(), timeout=1.0)
+            except asyncio.TimeoutError:
+                # Periodically check if the call loop has finished.
+                if call_ended_event and call_ended_event.is_set():
+                    logger.info("Call loop ended — closing stream %s", stream_sid)
+                    break
+                continue
+
             msg = json.loads(raw)
             event = msg.get("event")
 
@@ -366,16 +459,38 @@ async def twilio_media_stream(ws: WebSocket):
                         lead_data=lead_data,
                         audio_source=_audio_source(),
                         audio_sink=_audio_sink,
+                        filler_sink=_filler_sink,
                     )
+                    call_ended_event = call_manager.get_call_ended_event(call_id)
 
             elif event == "media":
                 mulaw = base64.b64decode(msg["media"]["payload"])
-                pcm_8k = audioop.ulaw2lin(mulaw, 2)
-                pcm_16k, new_state = audioop.ratecv(
-                    pcm_8k, 2, 1, 8000, 16000, _in_state
+                # μ-law decode → int16 PCM @ 8 kHz
+                pcm_8k_bytes = audioop.ulaw2lin(mulaw, 2)
+                # Upsample 8 → 16 kHz with anti-aliased polyphase FIR
+                samples = (
+                    np.frombuffer(pcm_8k_bytes, dtype=np.int16)
+                    .astype(np.float32)
+                    / 32768.0
                 )
-                _in_state = new_state
+                samples_16k = resample_poly(samples, 2, 1)
+                pcm_16k = (
+                    (samples_16k * 32768.0)
+                    .clip(-32768, 32767)
+                    .astype(np.int16)
+                    .tobytes()
+                )
                 inbound_q.put_nowait(pcm_16k)
+                _chunk_count[0] += 1
+                if _chunk_count[0] % 50 == 0:
+                    logger.debug(
+                        "[AUDIO] chunk #%d bytes=%d call=%s",
+                        _chunk_count[0], len(mulaw), call_id or "none",
+                    )
+                # Also check call-ended here for fast response (fires every ~20 ms)
+                if call_ended_event and call_ended_event.is_set():
+                    logger.info("Call loop ended — closing stream %s", stream_sid)
+                    break
 
             elif event == "stop":
                 logger.info("Twilio stream stopped — streamSid=%s", stream_sid)
@@ -404,17 +519,24 @@ class StartCallRequest(BaseModel):
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint — returns JSON status of all services."""
     llm_ok = await llm_client.health_check() if llm_client else False
     tts_ok = await tts_handler.health_check() if tts_handler else False
+    stt_ok = stt_handler is not None and stt_handler._is_initialized if stt_handler else False
+    sip_ok = sip_handler and getattr(sip_handler, "_registered", False)
+    active = call_manager.get_active_calls() if call_manager else []
+
+    components = {
+        "stt": "ok" if stt_ok else "degraded",
+        "llm": "ok" if llm_ok else "degraded",
+        "tts": "ok" if tts_ok else "degraded",
+        "sip": "registered" if sip_ok else "disconnected",
+    }
+    all_ok = stt_ok and llm_ok and tts_ok
     return {
-        "status": "healthy",
-        "components": {
-            "llm": "ok" if llm_ok else "degraded",
-            "tts": "ok" if tts_ok else "degraded",
-            "sip": "registered" if (sip_handler and sip_handler._registered) else "disconnected",
-        },
-        "active_calls": len(call_manager.get_active_calls()) if call_manager else 0,
+        "status": "healthy" if all_ok else "degraded",
+        "components": components,
+        "active_calls": len(active),
     }
 
 
@@ -437,6 +559,65 @@ async def call_metrics(call_id: str):
         "duration_s": metrics.duration_s,
         "total_turns": metrics.total_turns,
         "final_stage": metrics.final_stage,
+    }
+
+
+@app.get("/test-audio")
+async def test_audio():
+    """Generate a 3-second TTS sample and save as test_audio.wav at 8 kHz.
+
+    Synthesises a known phrase through the full Kokoro → resample → PCM
+    pipeline (without μ-law encoding) and writes a WAV file to the repo
+    root for offline quality inspection.
+
+    Returns:
+        JSON with sample count, duration, sample rate, and filename.
+    """
+    import wave
+    from math import gcd as _gcd
+
+    if not tts_handler:
+        raise HTTPException(503, "TTS handler not ready.")
+
+    phrase = (
+        "Hi, this is Sarah with American Beneficiary. "
+        "Did I catch you at a good time?"
+    )
+
+    tts_sr = get_tts_config().sample_rate  # 24 000 Hz
+    _g = _gcd(tts_sr, 8000)
+    up_ratio   = 8000 // _g    # 1
+    down_ratio = tts_sr // _g  # 3
+
+    pcm_chunks: list[bytes] = []
+    async for chunk in tts_handler.synthesize_stream(phrase):
+        # Resample from TTS sample rate to 8 kHz (same path as _audio_sink)
+        samples = np.frombuffer(chunk.audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+        samples = np.clip(samples, -1.0, 1.0)
+        samples_8k = resample_poly(samples, up_ratio, down_ratio)
+        pcm_8k = (samples_8k * 32768.0).clip(-32768, 32767).astype(np.int16).tobytes()
+        pcm_chunks.append(pcm_8k)
+
+    if not pcm_chunks:
+        raise HTTPException(500, "TTS returned no audio.")
+
+    all_pcm = b"".join(pcm_chunks)
+    total_samples = len(all_pcm) // 2  # int16 = 2 bytes/sample
+    duration_s = total_samples / 8000.0
+
+    wav_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "test_audio.wav")
+    with wave.open(wav_path, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)     # 16-bit
+        wf.setframerate(8000)  # 8 kHz
+        wf.writeframes(all_pcm)
+
+    return {
+        "status": "ok",
+        "samples": total_samples,
+        "duration_s": round(duration_s, 3),
+        "sample_rate": 8000,
+        "file": "test_audio.wav",
     }
 
 

@@ -99,13 +99,15 @@ class LLMConfig:
 
 @dataclass(frozen=True)
 class TTSConfig:
-    """CosyVoice 2 text-to-speech settings."""
+    """Kokoro v0.9 text-to-speech settings."""
 
-    model_name: str = field(default_factory=lambda: _env("TTS_MODEL", "CosyVoice2-0.5B"))
+    model_name: str = field(default_factory=lambda: _env("TTS_MODEL", "kokoro-v0.9"))
     api_url: str = field(default_factory=lambda: _env("TTS_API_URL", "http://127.0.0.1:8001"))
     voice_id: str = field(default_factory=lambda: _env("TTS_VOICE_ID", "friendly_female"))
     sample_rate: int = field(default_factory=lambda: _env_int("TTS_SAMPLE_RATE", 24000))
-    speed: float = field(default_factory=lambda: _env_float("TTS_SPEED", 1.0))
+    # 0.88 = ~12 % slower than neutral; keeps natural conversational cadence.
+    # Override via TTS_SPEED env var (valid range 0.75–1.25).
+    speed: float = field(default_factory=lambda: _env_float("TTS_SPEED", 0.88))
     streaming: bool = field(default_factory=lambda: _env_bool("TTS_STREAMING", True))
 
 

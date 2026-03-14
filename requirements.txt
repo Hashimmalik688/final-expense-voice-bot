@@ -20,6 +20,7 @@ pyyaml>=6.0.0
 
 # --- Data processing ---
 numpy>=1.26.0
+scipy>=1.12.0
 
 # --- Data validation ---
 pydantic>=2.9.0
@@ -32,6 +33,9 @@ sentence-transformers>=2.7.0
 
 # --- Voice Activity Detection (adopted from ShayneP/local-voice-ai) ---
 silero-vad>=5.1.2
+
+# --- TTS (Kokoro v0.9 text-to-speech engine) ---
+kokoro>=0.9.0
 
 # --- NeMo ASR (Parakeet TDT speech-to-text) —REQUIRED for STT —
 nemo_toolkit[asr]>=2.1.0

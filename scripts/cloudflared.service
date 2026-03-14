@@ -1,0 +1,52 @@
+# /etc/systemd/system/cloudflared-voicebot.service
+#
+# Runs the Cloudflare Tunnel as a system service so it auto-starts on
+# Vast.ai instance reboots (or any Linux server managed by systemd).
+#
+# Install:
+#   sudo cp scripts/cloudflared.service /etc/systemd/system/cloudflared-voicebot.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now cloudflared-voicebot
+#
+# Verify:
+#   sudo systemctl status cloudflared-voicebot
+#   journalctl -u cloudflared-voicebot -f
+#
+# The tunnel credentials file is placed by `cloudflared tunnel login` and
+# `cloudflared tunnel create voicebot`.  Adjust User= and the credentials
+# path if you ran those commands as a non-root user.
+# ---------------------------------------------------------------------------
+
+[Unit]
+Description=Cloudflare Tunnel – Final Expense Voice Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Run as root on Vast.ai (where there is typically only one user).
+# On a proper server, create a dedicated 'cloudflared' user instead.
+User=root
+
+# Restart automatically if cloudflared crashes or the node reboots.
+Restart=on-failure
+RestartSec=5s
+
+# The tunnel name must match what was created with:
+#   cloudflared tunnel create voicebot
+ExecStart=/usr/local/bin/cloudflared tunnel \
+    --no-autoupdate \
+    run voicebot
+
+# cloudflared reads credentials and config from ~/.cloudflared/ by default.
+# Override with --credentials-file /path/to/<UUID>.json if needed.
+
+# Redirect logs to journald (view with: journalctl -u cloudflared-voicebot)
+StandardOutput=journal
+StandardError=journal
+
+# Give the tunnel 30 s to drain open connections on stop/restart.
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
