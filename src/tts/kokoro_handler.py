@@ -120,17 +120,15 @@ class KokoroTTSHandler:
     # LLMs habitually start with acknowledgment phrases that sound robotic
     # when spoken aloud.  Strip them so the actual content plays first.
     _AI_SLOP_RE = re.compile(
-        r'^(?:'
-        r'(?:Certainly|Absolutely|Of\s+course|Sure(?:\s+thing)?|'
-        r'Great(?:\s+question)?|Fantastic|Awesome|No\s+problem|'
-        r'Understood|Got\s+it|I\s+understand|I\s+hear\s+you|'
-        r'That\s+makes\s+sense|I\s+appreciate\s+(?:that|your\s+\w+)|'
-        r'Thank\s+you\s+for\s+(?:sharing|that|asking)|'
-        r'I\'d\s+be\s+(?:happy|glad|delighted)\s+to(?:\s+help)?|'
-        r'Allow\s+me\s+to|Let\s+me\s+(?:help|explain|clarify)|'
-        r'I\s+totally\s+(?:understand|get\s+that)'
-        r')'
-        r'(?:[,!.]\s*|\s+)',
+        r'^(?:Certainly|Absolutely|Of\s+course|Sure(?:\s+thing)?'
+        r'|Great(?:\s+question)?|Fantastic|Awesome|No\s+problem'
+        r'|Understood|Got\s+it|I\s+understand|I\s+hear\s+you'
+        r'|That\s+makes\s+sense|I\s+appreciate\s+(?:that|your\s+\w+)'
+        r'|Thank\s+you\s+for\s+(?:sharing|that|asking)'
+        r'|I\'d\s+be\s+(?:happy|glad|delighted)\s+to(?:\s+help)?'
+        r'|Allow\s+me\s+to|Let\s+me\s+(?:help|explain|clarify)'
+        r'|I\s+totally\s+(?:understand|get\s+that)'
+        r')(?:[,!.]\s*|\s+)',
         re.IGNORECASE,
     )
 
