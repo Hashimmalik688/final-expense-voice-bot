@@ -373,6 +373,7 @@ let room = null;
 let audioCtx = null, analyserLocal = null, analyserRemote = null, meterInterval = null;
 let mockWs = null, mockRecognition = null, _ttsResumeTimer = null;
 let _ttsVoicesReady = false;
+let _ttsSpeaking = false;
 
 function log(msg) {
   const ts = new Date().toLocaleTimeString();
@@ -548,10 +549,20 @@ async function startMockCall(tokenData, localStream) {
     mockRecognition.continuous = true; mockRecognition.interimResults = false; mockRecognition.lang = "en-US";
     mockRecognition.onresult = (e) => {
       const txt = e.results[e.results.length - 1][0].transcript.trim();
-      if (txt && mockWs && mockWs.readyState === WebSocket.OPEN)
+      if (txt && mockWs && mockWs.readyState === WebSocket.OPEN) {
+        log("You said: " + txt);
         mockWs.send(JSON.stringify({ type: "user_speech", text: txt }));
+      }
     };
-    mockRecognition.onerror = (e) => log("Speech recognition: " + e.error);
+    mockRecognition.onerror = (e) => {
+      if (e.error !== "no-speech" && e.error !== "aborted") log("Speech recognition error: " + e.error);
+    };
+    mockRecognition.onend = () => {
+      // Chrome stops recognition when TTS plays — auto-restart once Sarah finishes
+      if (!_ttsSpeaking && mockWs && mockWs.readyState === WebSocket.OPEN) {
+        try { mockRecognition.start(); } catch(_) {}
+      }
+    };
     mockRecognition.start();
     addMessage("[ Microphone active \u2014 speak to Sarah ]", "system");
     log("Web Speech API started");
@@ -593,6 +604,9 @@ if ("speechSynthesis" in window) {
 function speakSarah(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
+  // Stop recognition while Sarah speaks — Chrome can't do both at once
+  _ttsSpeaking = true;
+  if (mockRecognition) { try { mockRecognition.stop(); } catch(_) {} }
   const _doSpeak = () => {
     const utt = new SpeechSynthesisUtterance(text);
     utt.rate = 0.95; utt.pitch = 1.0; utt.volume = 1.0;
@@ -606,7 +620,18 @@ function speakSarah(text) {
       allVoices.find(v => /microsoft.*zira/i.test(v.name))     ||
       allVoices.find(v => /en[-_]?(us|gb|au)/i.test(v.lang) && v.name);
     if (pick) utt.voice = pick;
-    utt.onerror = (e) => console.warn("TTS error:", e.error);
+    utt.onerror = (e) => {
+      console.warn("TTS error:", e.error);
+      _ttsSpeaking = false;
+      if (mockWs && mockWs.readyState === WebSocket.OPEN && mockRecognition)
+        setTimeout(() => { try { mockRecognition.start(); } catch(_) {} }, 300);
+    };
+    utt.onend = () => {
+      _ttsSpeaking = false;
+      // Resume listening after Sarah finishes — small gap so mic doesn't catch echo
+      if (mockWs && mockWs.readyState === WebSocket.OPEN && mockRecognition)
+        setTimeout(() => { try { mockRecognition.start(); log("Listening…"); } catch(_) {} }, 400);
+    };
     window.speechSynthesis.speak(utt);
   };
   if (_ttsVoicesReady || window.speechSynthesis.getVoices().length > 0) setTimeout(_doSpeak, 50);
@@ -626,10 +651,11 @@ function setCallActive(active) {
 async function hangUp() {
   btnCall.disabled = true;
   log("Hanging up\u2026");
+  _ttsSpeaking = false; // prevent onend from restarting recognition
   _stopTTSWatchdog();
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  if (mockRecognition) { try { mockRecognition.onend = null; mockRecognition.stop(); } catch(_){} mockRecognition = null; }
   if (mockWs)  { mockWs.close(); mockWs = null; }
-  if (mockRecognition) { try { mockRecognition.stop(); } catch(_){} mockRecognition = null; }
   if (room) { await room.disconnect(); room = null; }
   textInputRow.style.display = "none";
 }
