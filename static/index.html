@@ -375,6 +375,43 @@ let mockWs = null, mockRecognition = null, _ttsResumeTimer = null;
 let _ttsVoicesReady = false;
 let _ttsSpeaking = false;
 
+// ── Client-side keyword reply engine (no server restart needed) ──────────────
+const _MOCK_RULES = [
+  [/\b(no|not now|bad time|busy|not right|wrong number|didn.t|did not|dont|don.t)\b/,
+   "Oh, I'm sorry to catch you at a bad time! This will only take about 60 seconds. We received an inquiry about final expense coverage for your household — is there a better time I can reach you today?"],
+  [/\b(bye|goodbye|hang up|stop calling|remove me|do not call)\b/,
+   "Absolutely, I'll make a note of that. You're always welcome to call us back. Have a wonderful day!"],
+  [/\b(1[0-9]|2[0-9]|3[0-9]|4[0-4])\s*(year|yr|old)?\b/,
+   "I see — our program is specifically for adults between 45 and 85, so it sounds like the timing may not be right just yet. Is there anyone in your household in that age range?"],
+  [/\b(4[5-9]|[5-7][0-9]|8[0-5])\s*(year|yr|old)?\b/,
+   "That's perfect — you're right in our coverage range! And are you currently covered under any final expense or burial insurance policy?"],
+  [/\b(yes|yeah|yep|sure|okay|ok|go ahead|of course|fine|alright|absolutely|correct)\b/,
+   "Wonderful! Just to confirm — are you between the ages of 45 and 85?"],
+  [/\b(covered|have (a )?insurance|already have|existing policy|insured)\b/,
+   "That's great to know! Many of our clients find their current coverage doesn't fully cover funeral and final expense costs, which can run $10,000–$25,000. Would you be open to seeing if we can offer you a better rate or supplemental coverage?"],
+  [/\b(no insurance|not covered|don.t have|nothing|none|uninsured|no policy)\b/,
+   "I understand — that's actually very common. A small policy starting as low as $20 a month can take a huge burden off your family. Can I take just two minutes to walk you through what's available?"],
+  [/\b(how much|what.s the cost|price|rate|afford|cheap|expensive|monthly|premium|payment)\b/,
+   "Great question! Coverage typically starts as low as $20 to $30 a month depending on age and health — and there's no medical exam required. Does that sound like something worth looking into?"],
+  [/\b(tell me more|interested|sounds good|what.s included|what do i get|benefits|details)\b/,
+   "Absolutely! Our plans cover funeral costs, burial, and outstanding medical bills — up to $25,000 in coverage. Premiums are locked in for life and the policy builds cash value. Let me connect you with a specialist to lock in your rate today."],
+  [/\b(not interested|no thank you|no thanks|pass|forget it|leave me alone)\b/,
+   "I completely understand. I won't take any more of your time. If you ever change your mind, we're here. Have a great day!"],
+];
+const _MOCK_FALLBACK = [
+  "I hear you. Just to make sure I have the right information — are you between the ages of 45 and 85?",
+  "Got it. And are you currently covered under any final expense or burial insurance policy?",
+  "I understand. A small policy can take a huge burden off your family. Can I take two minutes to walk you through what's available?",
+  "Based on what you've shared, you could qualify for coverage starting as low as $20 a month. Does that sound like something worth looking into?",
+  "Wonderful — let me connect you with one of our senior benefit specialists who can lock in your rate today.",
+];
+function pickMockReply(text, idx) {
+  const lower = text.toLowerCase();
+  for (const [patt, reply] of _MOCK_RULES)
+    if (patt.test(lower)) return [reply, idx];
+  return [_MOCK_FALLBACK[idx % _MOCK_FALLBACK.length], idx + 1];
+}
+
 function log(msg) {
   const ts = new Date().toLocaleTimeString();
   logPre.textContent += `[${ts}] ${msg}\n`;
@@ -525,43 +562,50 @@ function _stopTTSWatchdog() {
 
 async function startMockCall(tokenData, localStream) {
   setCallActive(true);
-  addMessage("[ Mock mode \u2014 Sarah connected ]", "system");
   startMeters(localStream, null);
-  const wsProto = location.protocol === "https:" ? "wss" : "ws";
-  const wsUrl = `${wsProto}://${location.host}/mock/ws?room=${encodeURIComponent(tokenData.room)}`;
-  log("Mock WS: " + wsUrl);
-  mockWs = new WebSocket(wsUrl);
-  mockWs.onopen  = () => { setStatus("Connected \u2014 Sarah is live", "connected"); setStatusSub("Mock mode \u00b7 Scripted responses"); log("Mock WS open"); _startTTSWatchdog(); };
-  mockWs.onclose = () => { log("Mock WS closed"); _stopTTSWatchdog(); onCallEnded(); };
-  mockWs.onerror = () => { log("Mock WS error"); setStatus("Connection error", "error"); };
-  mockWs.onmessage = (ev) => {
-    try {
-      const msg = JSON.parse(ev.data);
-      if (msg.type === "transcript") {
-        addMessage(msg.text, msg.speaker === "user" ? "you" : "sarah");
-        if (msg.speaker !== "user") speakSarah(msg.text);
-      }
-    } catch(_) {}
-  };
+  // Sentinel — keeps `if (mockWs || ...)` hangup check working without a real WS
+  mockWs = { _mock: true, readyState: 1, close() {} };
+  setStatus("Connected \u2014 Sarah is live", "connected");
+  setStatusSub("Mock mode \u00b7 Smart responses");
+  _startTTSWatchdog();
+  addMessage("[ Mock mode \u2014 Sarah connected ]", "system");
+  log("Mock mode: running fully client-side (no WebSocket needed)");
+
+  let fallbackIdx = 0;
+
+  function sarahSays(text) {
+    if (!mockWs) return;
+    addMessage(text, "sarah");
+    speakSarah(text);
+  }
+
+  function handleUserInput(txt) {
+    if (!txt.trim() || !mockWs) return;
+    log("You said: " + txt);
+    addMessage(txt, "you");
+    const [reply, newIdx] = pickMockReply(txt, fallbackIdx);
+    fallbackIdx = newIdx;
+    setTimeout(() => sarahSays(reply), 1000);
+  }
+
+  // Opening greeting
+  setTimeout(() => sarahSays(
+    "Hi, this is Sarah with American Beneficiary \u2014 I'm calling about the final expense coverage inquiry we received. Did I catch you at an okay time?"
+  ), 600);
+
   if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     mockRecognition = new SR();
     mockRecognition.continuous = true; mockRecognition.interimResults = false; mockRecognition.lang = "en-US";
     mockRecognition.onresult = (e) => {
       const txt = e.results[e.results.length - 1][0].transcript.trim();
-      if (txt && mockWs && mockWs.readyState === WebSocket.OPEN) {
-        log("You said: " + txt);
-        mockWs.send(JSON.stringify({ type: "user_speech", text: txt }));
-      }
+      handleUserInput(txt);
     };
     mockRecognition.onerror = (e) => {
       if (e.error !== "no-speech" && e.error !== "aborted") log("Speech recognition error: " + e.error);
     };
     mockRecognition.onend = () => {
-      // Chrome stops recognition when TTS plays — auto-restart once Sarah finishes
-      if (!_ttsSpeaking && mockWs && mockWs.readyState === WebSocket.OPEN) {
-        try { mockRecognition.start(); } catch(_) {}
-      }
+      if (!_ttsSpeaking && mockWs) { try { mockRecognition.start(); } catch(_) {} }
     };
     mockRecognition.start();
     addMessage("[ Microphone active \u2014 speak to Sarah ]", "system");
@@ -571,9 +615,8 @@ async function startMockCall(tokenData, localStream) {
     log("SpeechRecognition unavailable \u2014 showing text input");
     textInputRow.style.display = "block"; textInput.focus();
     textInput.onkeydown = (e) => {
-      if (e.key === "Enter" && textInput.value.trim() && mockWs && mockWs.readyState === WebSocket.OPEN) {
-        mockWs.send(JSON.stringify({ type: "user_speech", text: textInput.value.trim() }));
-        textInput.value = "";
+      if (e.key === "Enter" && textInput.value.trim()) {
+        handleUserInput(textInput.value.trim()); textInput.value = "";
       }
     };
   }
@@ -651,11 +694,13 @@ function setCallActive(active) {
 async function hangUp() {
   btnCall.disabled = true;
   log("Hanging up\u2026");
-  _ttsSpeaking = false; // prevent onend from restarting recognition
+  _ttsSpeaking = false;
   _stopTTSWatchdog();
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   if (mockRecognition) { try { mockRecognition.onend = null; mockRecognition.stop(); } catch(_){} mockRecognition = null; }
-  if (mockWs)  { mockWs.close(); mockWs = null; }
+  const wasMockMode = mockWs && mockWs._mock;
+  if (mockWs) { mockWs.close(); mockWs = null; }
+  if (wasMockMode) { onCallEnded(); return; }
   if (room) { await room.disconnect(); room = null; }
   textInputRow.style.display = "none";
 }
