@@ -441,7 +441,14 @@ async function startCall() {
     return;
   }
 
-  log(`Room: ${tokenData.room}  LK: ${tokenData.url}`);
+  log(`Room: ${tokenData.room}  LK: ${tokenData.url}  mock=${!!tokenData.mock}`);
+
+  // ── MOCK MODE — no LiveKit server needed ─────────────────────────────────
+  if (tokenData.mock) {
+    setStatus("Mock mode — connecting to Sarah…", "connected");
+    await startMockCall(tokenData, localStream);
+    return;
+  }
   setStatus("Connecting to LiveKit…");
 
   // Use the global LiveKitClient from the bundled UMD script
@@ -531,13 +538,93 @@ async function startCall() {
   }
 }
 
+// ── Mock call (MOCK_MODE=true, no LiveKit) ────────────────────────────────
+let mockWs = null;
+let mockRecognition = null;
+
+async function startMockCall(tokenData, localStream) {
+  btnCall.textContent = "📵 Hang Up";
+  btnCall.className   = "btn-call active";
+  btnCall.disabled    = false;
+  avatarEl.classList.add("speaking");
+  addBubble(txSarah, "[ Mock mode — Sarah connected ]", "system");
+  startMeters(localStream, null);
+
+  const wsProto = location.protocol === "https:" ? "wss" : "ws";
+  const wsUrl = `${wsProto}://${location.host}/mock/ws?room=${encodeURIComponent(tokenData.room)}`;
+  log("Mock WS: " + wsUrl);
+
+  mockWs = new WebSocket(wsUrl);
+  mockWs.onopen  = () => { setStatus("Connected (mock Sarah)", "connected"); log("Mock WS open"); };
+  mockWs.onclose = () => { log("Mock WS closed"); onCallEnded(); };
+  mockWs.onerror = (e) => { log("Mock WS error"); setStatus("Mock connection error", "error"); };
+
+  mockWs.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "transcript") {
+        if (msg.speaker === "user") {
+          addBubble(txYou, msg.text, "you");
+        } else {
+          addBubble(txSarah, msg.text, "sarah");
+          speakSarah(msg.text);
+        }
+      }
+    } catch(_) {}
+  };
+
+  // Use Web Speech API for mic input if available (Chrome/Edge)
+  if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    mockRecognition = new SR();
+    mockRecognition.continuous = true;
+    mockRecognition.interimResults = false;
+    mockRecognition.lang = "en-US";
+    mockRecognition.onresult = (e) => {
+      const txt = e.results[e.results.length - 1][0].transcript.trim();
+      if (txt && mockWs && mockWs.readyState === WebSocket.OPEN) {
+        mockWs.send(JSON.stringify({type: "user_speech", text: txt}));
+      }
+    };
+    mockRecognition.onerror = (e) => { log("Speech recognition: " + e.error); };
+    mockRecognition.start();
+    addBubble(txYou, "[ Microphone active — speak to Sarah ]", "system");
+    log("Web Speech API started");
+  } else {
+    addBubble(txYou, "[ Mic transcription unavailable in this browser — type below ]", "system");
+    log("SpeechRecognition not available — text input fallback");
+    // Show a simple text input fallback
+    const inp = document.createElement("input");
+    inp.type = "text"; inp.placeholder = "Type your reply and press Enter…";
+    inp.style.cssText = "width:100%;background:#1a2035;border:1px solid #2d3148;color:#e2e8f0;padding:8px 12px;border-radius:6px;font-size:0.85rem;margin-top:8px;";
+    inp.onkeydown = (e) => {
+      if (e.key === "Enter" && inp.value.trim() && mockWs && mockWs.readyState === WebSocket.OPEN) {
+        mockWs.send(JSON.stringify({type: "user_speech", text: inp.value.trim()}));
+        inp.value = "";
+      }
+    };
+    document.querySelector(".transcript-col.you").appendChild(inp);
+  }
+}
+
+function speakSarah(text) {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = 1.05; utt.pitch = 1.1;
+  // Pick a female voice if available
+  const voices = window.speechSynthesis.getVoices();
+  const female = voices.find(v => /female|woman|zira|hazel|aria|natasha/i.test(v.name));
+  if (female) utt.voice = female;
+  window.speechSynthesis.speak(utt);
+}
+
 async function hangUp() {
   btnCall.disabled = true;
   log("Hanging up…");
-  if (room) {
-    await room.disconnect();
-    room = null;
-  }
+  if (mockWs)  { mockWs.close(); mockWs = null; }
+  if (mockRecognition) { try { mockRecognition.stop(); } catch(_){} mockRecognition = null; }
+  if (room) { await room.disconnect(); room = null; }
 }
 
 function onCallEnded() {
@@ -558,5 +645,3 @@ function setStatus(text, cls) {
 
 })();
 </script>
-</body>
-</html>

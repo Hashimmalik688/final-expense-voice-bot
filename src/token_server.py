@@ -53,6 +53,32 @@ LIVEKIT_API_SECRET = os.environ.get("LIVEKIT_API_SECRET", "secret")
 VLLM_URL = os.environ.get("VLLM_API_URL", "http://127.0.0.1:8000")
 TTS_SERVER_URL = os.environ.get("TTS_SERVER_URL", "http://127.0.0.1:8002")
 
+# MOCK_MODE=true  → works on Windows without LiveKit server, vLLM, or GPU.
+# The /token endpoint returns a fake token, and /mock/ws provides a simple
+# echo-style Sarah persona over WebSocket so the browser UI shows green.
+MOCK_MODE = os.environ.get("MOCK_MODE", "false").lower() == "true"
+
+# Scripted opening + fallback replies used in mock mode
+_MOCK_OPENING = (
+    "Hi, this is Sarah with American Beneficiary — "
+    "I'm calling about the final expense coverage inquiry we received. "
+    "Did I catch you at an okay time?"
+)
+_MOCK_REPLIES = [
+    "That's great to hear. Just to confirm I have you in the right area — "
+    "are you between the ages of 45 and 85?",
+    "Perfect. And are you currently covered under any final expense or "
+    "burial insurance policy?",
+    "I understand. A lot of people in your situation find that even a small "
+    "policy can take a huge burden off their family. "
+    "Can I take just two more minutes to walk you through what's available?",
+    "Based on what you've told me it sounds like you could qualify for "
+    "coverage starting as low as $20 a month. Does that sound like "
+    "something worth looking into?",
+    "Wonderful — let me connect you with one of our senior benefit "
+    "specialists who can lock in your rate today.",
+]
+
 REPO_ROOT = Path(__file__).parent.parent
 ENV_FILE = REPO_ROOT / ".env"
 SCRIPT_FILE = REPO_ROOT / "config" / "sales_script.yaml"
@@ -76,8 +102,41 @@ if STATIC_DIR.exists():
 
 @app.get("/token")
 async def get_token(room: Optional[str] = None):
-    """Issue a LiveKit access token for a browser caller."""
+    """Issue a LiveKit access token for a browser caller.
+
+    In MOCK_MODE the server issues a real-looking JWT signed with the local
+    key but points the browser at the mock WebSocket endpoint instead of a
+    real LiveKit room, so the UI shows "Connected" without a LiveKit server.
+    """
     room_name = room or f"call-{uuid.uuid4().hex[:8]}"
+
+    if MOCK_MODE:
+        # Build a minimal JWT-shaped token (signed locally) so the browser
+        # doesn't error, then redirect it to our own mock WS endpoint.
+        try:
+            import jwt as _jwt  # PyJWT — installed with livekit-api
+            import time
+            payload = {
+                "sub": f"caller-{uuid.uuid4().hex[:6]}",
+                "iss": LIVEKIT_API_KEY,
+                "nbf": int(time.time()),
+                "exp": int(time.time()) + 3600,
+                "room": room_name,
+                "mock": True,
+            }
+            token = _jwt.encode(payload, LIVEKIT_API_SECRET, algorithm="HS256")
+        except Exception:
+            token = f"mock-token-{uuid.uuid4().hex}"
+        # Point browser at our own mock WebSocket room endpoint
+        mock_ws = f"ws://localhost:9000"
+        return {
+            "token": token,
+            "room": room_name,
+            "url": mock_ws,
+            "livekit_http": "http://localhost:9000",
+            "mock": True,
+        }
+
     try:
         from livekit import api as lk_api  # type: ignore
         token = (
@@ -108,6 +167,14 @@ async def get_token(room: Optional[str] = None):
 
 @app.get("/health")
 async def health():
+    if MOCK_MODE:
+        return {
+            "status": "ok",
+            "vllm": "mock",
+            "tts": "mock",
+            "livekit": "mock",
+            "mock_mode": True,
+        }
     checks = await asyncio.gather(
         _check_http(f"{VLLM_URL}/health", "vllm"),
         _check_http(f"{TTS_SERVER_URL}/health", "tts"),
@@ -301,6 +368,67 @@ async def admin_ws(ws: WebSocket):
     finally:
         if ws in _admin_clients:
             _admin_clients.remove(ws)
+
+
+# ---------------------------------------------------------------------------
+# Mock Sarah WebSocket — replaces LiveKit room in MOCK_MODE
+#
+# The browser JS normally connects to a LiveKit WebRTC room.  In mock mode
+# we point `url` at this server and `room` carries the name.  The JS in
+# index.html detects `mock: true` and connects to /mock/ws?room=<name>
+# instead of a LiveKit room.  We send JSON events that the browser renders
+# as transcript bubbles and audio (Web Speech API TTS).
+# ---------------------------------------------------------------------------
+
+@app.websocket("/mock/ws")
+async def mock_room_ws(ws: WebSocket, room: str = "mock"):
+    """Simulate a LiveKit Sarah agent over plain WebSocket for Windows dev."""
+    await ws.accept()
+    _reply_index = 0
+
+    async def _sarah(text: str) -> None:
+        await ws.send_json({
+            "type": "transcript",
+            "speaker": "sarah",
+            "text": text,
+        })
+
+    try:
+        # Send opening line immediately
+        await asyncio.sleep(0.5)
+        await _sarah(_MOCK_OPENING)
+
+        while True:
+            try:
+                raw = await asyncio.wait_for(ws.receive_text(), timeout=60)
+            except asyncio.TimeoutError:
+                await ws.send_json({"type": "ping"})
+                continue
+
+            msg = {}
+            try:
+                msg = json.loads(raw)
+            except Exception:
+                pass
+
+            if msg.get("type") == "user_speech":
+                user_text = msg.get("text", "")
+                if user_text:
+                    await ws.send_json({
+                        "type": "transcript",
+                        "speaker": "user",
+                        "text": user_text,
+                    })
+                await asyncio.sleep(1.2)  # simulate 1-2s thinking
+                reply = _MOCK_REPLIES[_reply_index % len(_MOCK_REPLIES)]
+                _reply_index += 1
+                await _sarah(reply)
+
+            elif msg.get("type") == "ping":
+                await ws.send_json({"type": "pong"})
+
+    except WebSocketDisconnect:
+        pass
 
 
 async def _broadcast_admin_event(payload: dict) -> None:
