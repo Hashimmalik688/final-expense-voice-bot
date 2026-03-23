@@ -1,334 +1,379 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Sarah — Final Expense Voice Bot Test</title>
+<title>Sarah — Final Expense Voice Bot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
-  :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --border: #2d3148;
-    --accent: #4f7ff5;
-    --accent-hover: #3a6ae0;
-    --danger: #e05a5a;
-    --danger-hover: #c94545;
-    --muted: #6b7280;
-    --text: #e2e8f0;
-    --text-dim: #94a3b8;
-    --green: #22c55e;
-    --yellow: #eab308;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
+/* Design Tokens */
+:root {
+  --bg:          #090e1a;
+  --surface:     #101624;
+  --surface-2:   #151d2e;
+  --surface-3:   #1c2640;
+  --border:      #1e2d45;
+  --border-light:#253352;
+  --accent:       #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-dim:   rgba(59,130,246,0.12);
+  --accent-glow:  rgba(59,130,246,0.25);
+  --green:        #10b981;
+  --green-dim:    rgba(16,185,129,0.12);
+  --yellow:       #f59e0b;
+  --yellow-dim:   rgba(245,158,11,0.12);
+  --danger:       #ef4444;
+  --danger-hover: #dc2626;
+  --danger-dim:   rgba(239,68,68,0.12);
+  --text:         #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:   #5d6f88;
+  --t-fast:   150ms ease-out;
+  --t-base:   220ms ease-out;
+  --t-slow:   300ms ease-out;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+.app-shell { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; }
 
-  header {
-    width: 100%;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 28px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  header h1 { font-size: 1.1rem; font-weight: 600; }
-  header a {
-    font-size: 0.8rem;
-    color: var(--accent);
-    text-decoration: none;
-  }
-  header a:hover { text-decoration: underline; }
+/* Top Bar */
+.topbar {
+  position: sticky; top: 0; z-index: 40;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  backdrop-filter: blur(8px);
+}
+.topbar-brand { display: flex; align-items: center; gap: 12px; }
+.brand-icon {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, var(--accent), #7c3aed);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.brand-icon svg { width: 16px; height: 16px; color: #fff; }
+.brand-name { font-weight: 600; font-size: 0.95rem; letter-spacing: -0.01em; }
+.brand-name span { font-weight: 400; color: var(--text-secondary); margin-left: 6px; font-size: 0.82rem; }
+.topbar-nav { display: flex; align-items: center; gap: 16px; }
+.service-pills { display: flex; gap: 6px; }
+.pill {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 9999px; padding: 3px 12px;
+  font-size: 0.72rem; font-weight: 500; color: var(--text-secondary);
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+.pill .dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted);
+  flex-shrink: 0; transition: background var(--t-base), box-shadow var(--t-base);
+}
+.pill.green  { border-color: rgba(16,185,129,0.3); background: var(--green-dim); color: var(--green); }
+.pill.green  .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.pill.yellow { border-color: rgba(245,158,11,0.3); background: var(--yellow-dim); color: var(--yellow); }
+.pill.yellow .dot { background: var(--yellow); }
+.pill.red    { border-color: rgba(239,68,68,0.25); color: var(--danger); }
+.pill.red    .dot { background: var(--danger); }
+.topbar-link {
+  font-size: 0.8rem; color: var(--accent); text-decoration: none;
+  display: flex; align-items: center; gap: 4px;
+  padding: 8px 12px; border: 1px solid transparent; border-radius: 6px;
+  font-weight: 500; transition: background var(--t-fast), border-color var(--t-fast); cursor: pointer;
+}
+.topbar-link:hover { background: var(--accent-dim); border-color: rgba(59,130,246,0.3); }
+.topbar-link svg { width: 13px; height: 13px; }
 
-  main {
-    width: 100%;
-    max-width: 900px;
-    padding: 32px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-  }
+/* Main Grid */
+.main-grid {
+  width: 100%; max-width: 1060px; margin: 0 auto;
+  padding: 32px 20px;
+  display: grid; grid-template-columns: 340px 1fr;
+  gap: 20px; align-items: start;
+}
+@media (max-width: 768px) { .main-grid { grid-template-columns: 1fr; padding: 20px 16px; } }
 
-  /* Call control panel */
-  .call-panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 28px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-  }
+/* Card */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.card-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+}
+.card-header-icon {
+  width: 28px; height: 28px; border-radius: 6px; background: var(--surface-3);
+  display: flex; align-items: center; justify-content: center; color: var(--text-secondary); flex-shrink: 0;
+}
+.card-header-icon svg { width: 14px; height: 14px; }
+.card-title { font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-secondary); }
 
-  .avatar {
-    width: 80px; height: 80px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #4f7ff5 0%, #7c5cbf 100%);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 2rem;
-    position: relative;
-  }
-  .avatar.speaking::after {
-    content: '';
-    position: absolute;
-    inset: -6px;
-    border-radius: 50%;
-    border: 2px solid var(--accent);
-    animation: pulse 1.2s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 0.6; transform: scale(1); }
-    50%       { opacity: 1;   transform: scale(1.06); }
-  }
+/* Call Panel */
+.call-panel { display: flex; flex-direction: column; }
+.call-center {
+  padding: 32px 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 20px;
+  border-bottom: 1px solid var(--border);
+}
 
-  .status-text {
-    font-size: 1rem;
-    color: var(--text-dim);
-    text-align: center;
-    min-height: 1.4em;
-  }
-  .status-text.connected { color: var(--green); font-weight: 600; }
-  .status-text.error { color: var(--danger); }
+/* Avatar */
+.avatar-ring { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
+.avatar-ring::before {
+  content: ''; position: absolute; inset: -3px; border-radius: 50%;
+  background: conic-gradient(var(--accent) 0%, transparent 60%);
+  opacity: 0; transition: opacity var(--t-slow);
+}
+.avatar-ring.active::before { opacity: 1; animation: spin-ring 3s linear infinite; }
+@keyframes spin-ring { to { transform: rotate(360deg); } }
+.avatar-inner {
+  position: relative; width: 100%; height: 100%; border-radius: 50%;
+  background: linear-gradient(135deg, #1d4ed8 0%, #6d28d9 100%);
+  display: flex; align-items: center; justify-content: center;
+  border: 3px solid var(--surface); overflow: hidden; z-index: 1;
+}
+.avatar-inner svg { width: 42px; height: 42px; color: rgba(255,255,255,0.9); }
+.avatar-pulse {
+  position: absolute; inset: -12px; border-radius: 50%;
+  border: 2px solid var(--accent); opacity: 0; transform: scale(0.85);
+}
+.avatar-ring.active .avatar-pulse { animation: pulse-ring 1.6s ease-out infinite; }
+@keyframes pulse-ring {
+  0%   { opacity: 0.8; transform: scale(0.85); }
+  100% { opacity: 0;   transform: scale(1.15); }
+}
 
-  .btn-call {
-    padding: 14px 48px;
-    border-radius: 50px;
-    border: none;
-    cursor: pointer;
-    font-size: 1rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    transition: background 0.2s, transform 0.1s;
-  }
-  .btn-call:active { transform: scale(0.97); }
-  .btn-call.idle    { background: var(--accent);  color: #fff; }
-  .btn-call.idle:hover    { background: var(--accent-hover); }
-  .btn-call.active  { background: var(--danger);  color: #fff; }
-  .btn-call.active:hover  { background: var(--danger-hover); }
-  .btn-call:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Status */
+.call-status { text-align: center; }
+.call-status-text { font-size: 0.92rem; font-weight: 500; color: var(--text-secondary); min-height: 1.4em; transition: color var(--t-base); }
+.call-status-text.connected { color: var(--green); }
+.call-status-text.error     { color: var(--danger); }
+.call-status-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
 
-  .meta-row {
-    display: flex;
-    gap: 20px;
-    font-size: 0.78rem;
-    color: var(--muted);
-  }
-  .meta-row span { display: flex; align-items: center; gap: 5px; }
-  .dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--muted);
-  }
-  .dot.green  { background: var(--green); box-shadow: 0 0 6px var(--green); }
-  .dot.yellow { background: var(--yellow);}
-  .dot.red    { background: var(--danger);}
+/* Meters */
+.meters { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.meter-row { display: flex; align-items: center; gap: 12px; }
+.meter-label { font-size: 0.72rem; color: var(--text-muted); width: 38px; flex-shrink: 0; font-weight: 500; }
+.meter-track { flex: 1; height: 4px; background: var(--surface-3); border-radius: 2px; overflow: hidden; }
+.meter-fill { height: 100%; border-radius: 2px; width: 0%; transition: width 80ms linear; }
+.meter-fill.local  { background: linear-gradient(90deg, var(--accent), #60a5fa); }
+.meter-fill.remote { background: linear-gradient(90deg, var(--green), #34d399); }
 
-  /* Volume meter */
-  .meter-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    max-width: 340px;
-  }
-  .meter-label { font-size: 0.75rem; color: var(--muted); width: 28px; }
-  .meter-bar {
-    flex: 1;
-    height: 6px;
-    background: var(--border);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-  .meter-fill {
-    height: 100%;
-    border-radius: 3px;
-    width: 0%;
-    transition: width 0.08s ease;
-  }
-  .meter-fill.local  { background: var(--accent); }
-  .meter-fill.remote { background: var(--green); }
+/* Actions */
+.call-actions {
+  width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 20px;
+}
+.btn-call {
+  min-width: 180px; min-height: 48px; padding: 0 32px; border: none; border-radius: 9999px;
+  cursor: pointer; font-family: inherit; font-size: 0.92rem; font-weight: 600; letter-spacing: 0.01em;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  transition: background var(--t-fast), transform var(--t-fast), box-shadow var(--t-fast);
+}
+.btn-call:active { transform: scale(0.96); }
+.btn-call:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.btn-call.idle {
+  background: var(--accent); color: #fff; box-shadow: 0 0 24px var(--accent-glow);
+}
+.btn-call.idle:hover:not(:disabled) { background: var(--accent-hover); box-shadow: 0 0 32px var(--accent-glow); }
+.btn-call.active { background: var(--danger); color: #fff; box-shadow: 0 0 20px rgba(239,68,68,0.2); }
+.btn-call.active:hover:not(:disabled) { background: var(--danger-hover); }
+.btn-call svg { width: 16px; height: 16px; flex-shrink: 0; }
 
-  /* Transcript */
-  .transcript-section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .transcript-section h2 {
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-  }
-  .transcript-body {
-    display: flex;
-    gap: 16px;
-    min-height: 200px;
-  }
-  .transcript-col {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .transcript-col h3 {
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 8px;
-  }
-  .transcript-col.you h3 { color: #60a5fa; }
-  .transcript-col.sarah h3 { color: #4ade80; }
+/* Voice Selector */
+.voice-control { display: flex; align-items: center; gap: 8px; width: 100%; }
+.voice-label {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.74rem; color: var(--text-muted); font-weight: 500; flex-shrink: 0; white-space: nowrap;
+}
+.voice-label svg { width: 13px; height: 13px; }
+.voice-select {
+  flex: 1; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); padding: 6px 10px;
+  font-size: 0.78rem; font-family: inherit; cursor: pointer; outline: none;
+  transition: border-color var(--t-fast);
+}
+.voice-select:hover { border-color: var(--border-light); }
+.voice-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
 
-  .transcript-scroll {
-    flex: 1;
-    height: 220px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding-right: 4px;
-  }
-  .transcript-scroll::-webkit-scrollbar { width: 4px; }
-  .transcript-scroll::-webkit-scrollbar-thumb {
-    background: var(--border); border-radius: 2px;
-  }
+/* Transcript */
+.transcript-panel { display: flex; flex-direction: column; height: 540px; }
+.transcript-feed {
+  flex: 1; overflow-y: auto; padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth;
+}
+.transcript-feed::-webkit-scrollbar { width: 4px; }
+.transcript-feed::-webkit-scrollbar-track { background: transparent; }
+.transcript-feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.msg-row { display: flex; flex-direction: column; gap: 2px; max-width: 88%; }
+.msg-row.you    { align-self: flex-end; align-items: flex-end; }
+.msg-row.sarah  { align-self: flex-start; align-items: flex-start; }
+.msg-row.system { align-self: center; align-items: center; max-width: 100%; }
+.msg-sender { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 0 8px; }
+.msg-bubble { padding: 10px 14px; border-radius: 10px; font-size: 0.875rem; line-height: 1.55; word-break: break-word; }
+.msg-row.you   .msg-bubble { background: var(--accent-dim); border: 1px solid rgba(59,130,246,0.2); color: #93c5fd; border-bottom-right-radius: 4px; }
+.msg-row.sarah .msg-bubble { background: var(--green-dim); border: 1px solid rgba(16,185,129,0.2); color: #6ee7b7; border-bottom-left-radius: 4px; }
+.msg-row.system .msg-bubble { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); font-size: 0.75rem; font-style: italic; border-radius: 9999px; padding: 4px 14px; }
+.text-input-row { padding: 12px 20px; border-top: 1px solid var(--border); }
+.text-input {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text); padding: 12px 16px;
+  font-size: 0.875rem; font-family: inherit; outline: none;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.text-input::placeholder { color: var(--text-muted); }
+.text-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
 
-  .bubble {
-    font-size: 0.85rem;
-    line-height: 1.5;
-    padding: 8px 12px;
-    border-radius: 8px;
-    max-width: 100%;
-    word-break: break-word;
-  }
-  .bubble.you    { background: #1e3a5f; color: #93c5fd; align-self: flex-start; }
-  .bubble.sarah  { background: #14432a; color: #86efac; align-self: flex-start; }
-  .bubble.system { background: #2d1f00; color: #fbbf24; font-style: italic;
-                   font-size: 0.78rem; }
+/* Debug */
+.debug-panel { margin-top: 20px; grid-column: 1 / -1; }
+.debug-summary {
+  font-size: 0.74rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-muted); cursor: pointer; user-select: none;
+  padding: 12px 20px; display: flex; align-items: center; gap: 8px; list-style: none;
+}
+.debug-summary svg { width: 12px; height: 12px; transition: transform var(--t-fast); }
+details[open] .debug-summary svg { transform: rotate(90deg); }
+.debug-body { padding: 0 20px 16px; }
+.log-pre {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px; font-family: 'Cascadia Code','Fira Code','Consolas',monospace;
+  font-size: 0.7rem; color: var(--text-secondary); height: 130px;
+  overflow-y: auto; white-space: pre-wrap; word-break: break-all; line-height: 1.6;
+}
+.log-pre::-webkit-scrollbar { width: 4px; }
+.log-pre::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-  /* Debug log */
-  .log-section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px 20px;
-  }
-  .log-section summary {
-    font-size: 0.78rem;
-    color: var(--muted);
-    cursor: pointer;
-    user-select: none;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-  .log-pre {
-    margin-top: 12px;
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
-    font-size: 0.72rem;
-    color: #94a3b8;
-    height: 140px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
-  }
-  .log-pre::-webkit-scrollbar { width: 4px; }
-  .log-pre::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
 </style>
 </head>
-
 <body>
-<header>
-  <h1>🎙 Sarah — Voice Bot Test</h1>
-  <a href="/admin">Admin Dashboard →</a>
+<div class="app-shell">
+
+<header class="topbar">
+  <div class="topbar-brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+    </div>
+    <span class="brand-name">Sarah <span>Final Expense Voice Bot</span></span>
+  </div>
+  <div class="topbar-nav">
+    <div class="service-pills">
+      <div class="pill" id="pill-lk"><span class="dot"></span>LiveKit</div>
+      <div class="pill" id="pill-vllm"><span class="dot"></span>vLLM</div>
+      <div class="pill" id="pill-tts"><span class="dot"></span>TTS</div>
+    </div>
+    <a class="topbar-link" href="/admin">
+      Admin
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </a>
+  </div>
 </header>
 
 <main>
-  <div class="call-panel">
-    <div class="avatar" id="avatar">🤖</div>
-    <div class="status-text" id="status">Ready to test. Click "Call Sarah" to begin.</div>
+<div class="main-grid">
 
-    <div class="meta-row">
-      <span><span class="dot" id="dot-lk"></span>LiveKit</span>
-      <span><span class="dot" id="dot-vllm"></span>vLLM</span>
-      <span><span class="dot" id="dot-tts"></span>TTS</span>
-    </div>
-
-    <div class="meter-row">
-      <span class="meter-label">You</span>
-      <div class="meter-bar"><div class="meter-fill local" id="meter-local"></div></div>
-    </div>
-    <div class="meter-row">
-      <span class="meter-label">Sarah</span>
-      <div class="meter-bar"><div class="meter-fill remote" id="meter-remote"></div></div>
-    </div>
-
-    <button class="btn-call idle" id="btn-call">📞 Call Sarah</button>
-  </div>
-
-  <div class="transcript-section">
-    <h2>Transcript</h2>
-    <div class="transcript-body">
-      <div class="transcript-col you">
-        <h3>You</h3>
-        <div class="transcript-scroll" id="tx-you"></div>
+  <div class="card call-panel">
+    <div class="card-header">
+      <div class="card-header-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.28 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.94-.94a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.66 16l.26.92z"/></svg>
       </div>
-      <div class="transcript-col sarah">
-        <h3>Sarah</h3>
-        <div class="transcript-scroll" id="tx-sarah"></div>
+      <span class="card-title">Live Call</span>
+    </div>
+    <div class="call-center">
+      <div class="avatar-ring" id="avatar-ring">
+        <div class="avatar-pulse"></div>
+        <div class="avatar-inner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+      </div>
+      <div class="call-status">
+        <div class="call-status-text" id="status">Ready — click Call Sarah to begin</div>
+        <div class="call-status-sub" id="status-sub"></div>
+      </div>
+      <div class="meters">
+        <div class="meter-row">
+          <span class="meter-label">You</span>
+          <div class="meter-track"><div class="meter-fill local" id="meter-local"></div></div>
+        </div>
+        <div class="meter-row">
+          <span class="meter-label">Sarah</span>
+          <div class="meter-track"><div class="meter-fill remote" id="meter-remote"></div></div>
+        </div>
       </div>
     </div>
+    <div class="call-actions">
+      <button class="btn-call idle" id="btn-call">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.28 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.94-.94a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.66 16l.26.92z"/></svg>
+        Call Sarah
+      </button>
+      <div class="voice-control">
+        <label class="voice-label" for="voice-select">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+          Voice
+        </label>
+        <select class="voice-select" id="voice-select" aria-label="Sarah voice"></select>
+      </div>
+    </div>
   </div>
 
-  <details class="log-section">
-    <summary>Debug Log</summary>
-    <pre class="log-pre" id="log-pre"></pre>
+  <div class="card transcript-panel">
+    <div class="card-header">
+      <div class="card-header-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <span class="card-title">Transcript</span>
+    </div>
+    <div class="transcript-feed" id="transcript-feed"></div>
+    <div class="text-input-row" id="text-input-row" style="display:none;">
+      <input class="text-input" id="text-input" type="text" placeholder="Type your reply and press Enter…" aria-label="Type message to Sarah"/>
+    </div>
+  </div>
+
+  <details class="card debug-panel">
+    <summary class="debug-summary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      Debug Log
+    </summary>
+    <div class="debug-body"><pre class="log-pre" id="log-pre"></pre></div>
   </details>
-</main>
 
-<!--
-  LiveKit browser client SDK — loaded from jsDelivr CDN.
-  The project uses no paid APIs, so no key needed for this CDN URL.
--->
+</div>
+</main>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
 <script>
 "use strict";
 (async () => {
 
-// ── DOM refs ────────────────────────────────────────────────────────────────
-const statusEl   = document.getElementById("status");
-const avatarEl   = document.getElementById("avatar");
-const btnCall    = document.getElementById("btn-call");
-const txYou      = document.getElementById("tx-you");
-const txSarah    = document.getElementById("tx-sarah");
-const logPre     = document.getElementById("log-pre");
-const meterLocal  = document.getElementById("meter-local");
-const meterRemote = document.getElementById("meter-remote");
-const dotLK      = document.getElementById("dot-lk");
-const dotVLLM    = document.getElementById("dot-vllm");
-const dotTTS     = document.getElementById("dot-tts");
+const statusEl     = document.getElementById("status");
+const statusSub    = document.getElementById("status-sub");
+const avatarRing   = document.getElementById("avatar-ring");
+const btnCall      = document.getElementById("btn-call");
+const txFeed       = document.getElementById("transcript-feed");
+const logPre       = document.getElementById("log-pre");
+const meterLocal   = document.getElementById("meter-local");
+const meterRemote  = document.getElementById("meter-remote");
+const pillLK       = document.getElementById("pill-lk");
+const pillVLLM     = document.getElementById("pill-vllm");
+const pillTTS      = document.getElementById("pill-tts");
+const voiceSelect  = document.getElementById("voice-select");
+const textInputRow = document.getElementById("text-input-row");
+const textInput    = document.getElementById("text-input");
 
 let room = null;
-let audioCtx = null;
-let analyserLocal = null;
-let analyserRemote = null;
-let meterInterval = null;
+let audioCtx = null, analyserLocal = null, analyserRemote = null, meterInterval = null;
+let mockWs = null, mockRecognition = null, _ttsResumeTimer = null;
+let _ttsVoicesReady = false;
 
-// ── Logging ─────────────────────────────────────────────────────────────────
 function log(msg) {
   const ts = new Date().toLocaleTimeString();
   logPre.textContent += `[${ts}] ${msg}\n`;
@@ -336,312 +381,271 @@ function log(msg) {
   console.log(msg);
 }
 
-// ── Health check ─────────────────────────────────────────────────────────────
+function setPillState(pill, state) {
+  pill.className = "pill";
+  if (state === "ok" || state === "mock") pill.classList.add("green");
+  else if (state === "degraded")          pill.classList.add("yellow");
+  else                                    pill.classList.add("red");
+}
+
 async function checkHealth() {
   try {
     const r = await fetch("/health");
     const d = await r.json();
-    dotLK.className   = "dot " + (d.livekit === "ok" ? "green" : "red");
-    dotVLLM.className = "dot " + (d.vllm    === "ok" ? "green" : (d.vllm === "degraded" ? "yellow" : "red"));
-    dotTTS.className  = "dot " + (d.tts     === "ok" ? "green" : (d.tts  === "degraded" ? "yellow" : "red"));
-    log(`Health: livekit=${d.livekit} vllm=${d.vllm} tts=${d.tts}`);
-  } catch(e) {
-    log("Health check failed: " + e.message);
-  }
+    setPillState(pillLK,   d.livekit || "red");
+    setPillState(pillVLLM, d.vllm    || "red");
+    setPillState(pillTTS,  d.tts     || "red");
+    log(`Health: lk=${d.livekit} vllm=${d.vllm} tts=${d.tts}`);
+  } catch(e) { log("Health check failed: " + e.message); }
 }
 checkHealth();
 setInterval(checkHealth, 30000);
 
-// ── Transcript helpers ────────────────────────────────────────────────────────
-function addBubble(container, text, cls) {
-  const div = document.createElement("div");
-  div.className = `bubble ${cls}`;
-  div.textContent = text;
-  container.appendChild(div);
-  container.scrollTop = container.scrollHeight;
+function addMessage(text, speaker) {
+  const row = document.createElement("div");
+  row.className = `msg-row ${speaker}`;
+  if (speaker !== "system") {
+    const s = document.createElement("div");
+    s.className = "msg-sender";
+    s.textContent = speaker === "you" ? "You" : "Sarah";
+    row.appendChild(s);
+  }
+  const b = document.createElement("div");
+  b.className = "msg-bubble";
+  b.textContent = text;
+  row.appendChild(b);
+  txFeed.appendChild(row);
+  txFeed.scrollTop = txFeed.scrollHeight;
 }
 
-// ── Volume meter ──────────────────────────────────────────────────────────────
 function startMeters(localStream, remoteStream) {
   audioCtx = new AudioContext();
-
-  function makeAnalyser(stream) {
+  const mk = (stream) => {
     if (!stream) return null;
     const src = audioCtx.createMediaStreamSource(stream);
     const an  = audioCtx.createAnalyser();
-    an.fftSize = 512;
-    src.connect(an);
-    return an;
-  }
-
-  analyserLocal  = makeAnalyser(localStream);
-  analyserRemote = makeAnalyser(remoteStream);
-
+    an.fftSize = 512; src.connect(an); return an;
+  };
+  analyserLocal  = mk(localStream);
+  analyserRemote = mk(remoteStream);
   const buf = new Uint8Array(128);
   meterInterval = setInterval(() => {
     const rms = (an) => {
       if (!an) return 0;
       an.getByteTimeDomainData(buf);
-      let sum = 0;
-      for (let i = 0; i < buf.length; i++) {
-        const v = (buf[i] - 128) / 128;
-        sum += v * v;
-      }
-      return Math.min(1, Math.sqrt(sum / buf.length) * 6);
+      let s = 0;
+      for (let i = 0; i < buf.length; i++) { const v = (buf[i]-128)/128; s += v*v; }
+      return Math.min(1, Math.sqrt(s/buf.length)*6);
     };
     meterLocal.style.width  = (rms(analyserLocal)  * 100) + "%";
     meterRemote.style.width = (rms(analyserRemote) * 100) + "%";
   }, 80);
 }
-
 function stopMeters() {
   if (meterInterval) { clearInterval(meterInterval); meterInterval = null; }
-  meterLocal.style.width  = "0%";
-  meterRemote.style.width = "0%";
+  meterLocal.style.width = meterRemote.style.width = "0%";
   if (audioCtx) { audioCtx.close(); audioCtx = null; }
   analyserLocal = analyserRemote = null;
 }
 
-// ── Call control ──────────────────────────────────────────────────────────────
 btnCall.addEventListener("click", async () => {
-  if (room && room.state === "connected") {
-    await hangUp();
-  } else {
-    await startCall();
-  }
+  if (mockWs || (room && room.state === "connected")) await hangUp();
+  else await startCall();
 });
 
 async function startCall() {
   btnCall.disabled = true;
-  setStatus("Requesting microphone…");
-  log("Requesting mic permission…");
-
+  setStatus("Requesting microphone\u2026");
   let localStream;
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
   } catch (e) {
-    setStatus("Mic access denied. Please allow microphone.", "error");
-    log("Mic error: " + e.message);
-    btnCall.disabled = false;
-    return;
+    setStatus("Mic access denied", "error");
+    setStatusSub("Please allow microphone access and try again.");
+    log("Mic error: " + e.message); btnCall.disabled = false; return;
   }
-
-  setStatus("Fetching LiveKit token…");
-  log("Fetching token…");
-
+  setStatus("Connecting to Sarah\u2026");
+  log("Fetching token\u2026");
   let tokenData;
   try {
     const r = await fetch("/token");
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     tokenData = await r.json();
   } catch (e) {
-    setStatus("Token error: " + e.message, "error");
-    log("Token error: " + e.message);
-    btnCall.disabled = false;
-    return;
+    setStatus("Connection failed: " + e.message, "error");
+    log("Token error: " + e.message); btnCall.disabled = false; return;
   }
-
   log(`Room: ${tokenData.room}  LK: ${tokenData.url}  mock=${!!tokenData.mock}`);
-
-  // ── MOCK MODE — no LiveKit server needed ─────────────────────────────────
-  if (tokenData.mock) {
-    setStatus("Mock mode — connecting to Sarah…", "connected");
-    await startMockCall(tokenData, localStream);
-    return;
-  }
-  setStatus("Connecting to LiveKit…");
-
-  // Use the global LiveKitClient from the bundled UMD script
+  if (tokenData.mock) { await startMockCall(tokenData, localStream); return; }
   const LK = window.LivekitClient;
-  room = new LK.Room({
-    adaptiveStream: false,
-    dynacast: false,
-  });
-
-  // ── Room event handlers ───────────────────────────────────────────────────
-
+  room = new LK.Room({ adaptiveStream: false, dynacast: false });
   room.on(LK.RoomEvent.Connected, () => {
-    log("Room connected ✓");
-    setStatus(`Connected — Room: ${tokenData.room}`, "connected");
-    btnCall.textContent = "📵 Hang Up";
-    btnCall.className   = "btn-call active";
-    btnCall.disabled    = false;
-    avatarEl.classList.add("speaking");
+    log("Room connected");
+    setStatus("Connected \u2014 Room: " + tokenData.room, "connected");
+    setStatusSub("Live call in progress"); setCallActive(true);
   });
-
-  room.on(LK.RoomEvent.Disconnected, () => {
-    log("Room disconnected");
-    onCallEnded();
-  });
-
+  room.on(LK.RoomEvent.Disconnected, () => { log("Room disconnected"); onCallEnded(); });
   room.on(LK.RoomEvent.TrackSubscribed, (track, pub, participant) => {
-    log(`Track subscribed: ${track.kind} from ${participant.identity}`);
+    log(`Track: ${track.kind} from ${participant.identity}`);
     if (track.kind === LK.Track.Kind.Audio) {
-      const el = track.attach();
-      el.style.display = "none";
-      document.body.appendChild(el);
-      addBubble(txSarah, "[ Sarah joined the call ]", "system");
-
-      // Wire Sarah's audio to remote meter
-      if (el.srcObject) {
-        startMeters(localStream, el.srcObject);
-      }
+      const el = track.attach(); el.style.display = "none"; document.body.appendChild(el);
+      addMessage("[ Sarah joined the call ]", "system");
+      if (el.srcObject) startMeters(localStream, el.srcObject);
     }
   });
-
-  room.on(LK.RoomEvent.TrackUnsubscribed, (track) => {
-    track.detach();
-  });
-
-  room.on(LK.RoomEvent.DataReceived, (payload, participant) => {
+  room.on(LK.RoomEvent.TrackUnsubscribed, (track) => { track.detach(); });
+  room.on(LK.RoomEvent.DataReceived, (payload) => {
     try {
       const msg = JSON.parse(new TextDecoder().decode(payload));
-      if (msg.type === "transcript") {
-        if (msg.speaker === "user") {
-          addBubble(txYou,   msg.text, "you");
-        } else {
-          addBubble(txSarah, msg.text, "sarah");
-        }
-      }
+      if (msg.type === "transcript") addMessage(msg.text, msg.speaker === "user" ? "you" : "sarah");
     } catch (_) {}
   });
-
-  room.on(LK.RoomEvent.ParticipantConnected, (p) => {
-    log(`Participant joined: ${p.identity}`);
-    addBubble(txSarah, `[ ${p.identity} connected ]`, "system");
-  });
-
-  room.on(LK.RoomEvent.ParticipantDisconnected, (p) => {
-    log(`Participant left: ${p.identity}`);
-    addBubble(txSarah, `[ ${p.identity} disconnected ]`, "system");
-  });
-
-  // ── Connect & publish mic ─────────────────────────────────────────────────
-  try {
-    await room.connect(tokenData.url, tokenData.token);
-  } catch (e) {
+  try { await room.connect(tokenData.url, tokenData.token); }
+  catch (e) {
     setStatus("Connection failed: " + e.message, "error");
-    log("Connect error: " + e.message);
-    btnCall.className = "btn-call idle";
-    btnCall.textContent = "📞 Call Sarah";
-    btnCall.disabled = false;
-    return;
+    log("Connect error: " + e.message); setCallActive(false); btnCall.disabled = false; return;
   }
-
   try {
     await room.localParticipant.setMicrophoneEnabled(true);
-    log("Microphone published ✓");
-    startMeters(localStream, null);
-    addBubble(txYou, "[ Microphone active ]", "system");
-  } catch (e) {
-    log("Publish mic error: " + e.message);
-  }
+    log("Microphone published"); startMeters(localStream, null);
+    addMessage("[ Microphone active ]", "system");
+  } catch (e) { log("Publish mic error: " + e.message); }
 }
 
-// ── Mock call (MOCK_MODE=true, no LiveKit) ────────────────────────────────
-let mockWs = null;
-let mockRecognition = null;
+function _startTTSWatchdog() {
+  _stopTTSWatchdog();
+  _ttsResumeTimer = setInterval(() => {
+    if (window.speechSynthesis && window.speechSynthesis.paused) window.speechSynthesis.resume();
+  }, 5000);
+}
+function _stopTTSWatchdog() {
+  if (_ttsResumeTimer) { clearInterval(_ttsResumeTimer); _ttsResumeTimer = null; }
+}
 
 async function startMockCall(tokenData, localStream) {
-  btnCall.textContent = "📵 Hang Up";
-  btnCall.className   = "btn-call active";
-  btnCall.disabled    = false;
-  avatarEl.classList.add("speaking");
-  addBubble(txSarah, "[ Mock mode — Sarah connected ]", "system");
+  setCallActive(true);
+  addMessage("[ Mock mode \u2014 Sarah connected ]", "system");
   startMeters(localStream, null);
-
   const wsProto = location.protocol === "https:" ? "wss" : "ws";
   const wsUrl = `${wsProto}://${location.host}/mock/ws?room=${encodeURIComponent(tokenData.room)}`;
   log("Mock WS: " + wsUrl);
-
   mockWs = new WebSocket(wsUrl);
-  mockWs.onopen  = () => { setStatus("Connected (mock Sarah)", "connected"); log("Mock WS open"); };
-  mockWs.onclose = () => { log("Mock WS closed"); onCallEnded(); };
-  mockWs.onerror = (e) => { log("Mock WS error"); setStatus("Mock connection error", "error"); };
-
+  mockWs.onopen  = () => { setStatus("Connected \u2014 Sarah is live", "connected"); setStatusSub("Mock mode \u00b7 Scripted responses"); log("Mock WS open"); _startTTSWatchdog(); };
+  mockWs.onclose = () => { log("Mock WS closed"); _stopTTSWatchdog(); onCallEnded(); };
+  mockWs.onerror = () => { log("Mock WS error"); setStatus("Connection error", "error"); };
   mockWs.onmessage = (ev) => {
     try {
       const msg = JSON.parse(ev.data);
       if (msg.type === "transcript") {
-        if (msg.speaker === "user") {
-          addBubble(txYou, msg.text, "you");
-        } else {
-          addBubble(txSarah, msg.text, "sarah");
-          speakSarah(msg.text);
-        }
+        addMessage(msg.text, msg.speaker === "user" ? "you" : "sarah");
+        if (msg.speaker !== "user") speakSarah(msg.text);
       }
     } catch(_) {}
   };
-
-  // Use Web Speech API for mic input if available (Chrome/Edge)
   if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     mockRecognition = new SR();
-    mockRecognition.continuous = true;
-    mockRecognition.interimResults = false;
-    mockRecognition.lang = "en-US";
+    mockRecognition.continuous = true; mockRecognition.interimResults = false; mockRecognition.lang = "en-US";
     mockRecognition.onresult = (e) => {
       const txt = e.results[e.results.length - 1][0].transcript.trim();
-      if (txt && mockWs && mockWs.readyState === WebSocket.OPEN) {
-        mockWs.send(JSON.stringify({type: "user_speech", text: txt}));
-      }
+      if (txt && mockWs && mockWs.readyState === WebSocket.OPEN)
+        mockWs.send(JSON.stringify({ type: "user_speech", text: txt }));
     };
-    mockRecognition.onerror = (e) => { log("Speech recognition: " + e.error); };
+    mockRecognition.onerror = (e) => log("Speech recognition: " + e.error);
     mockRecognition.start();
-    addBubble(txYou, "[ Microphone active — speak to Sarah ]", "system");
+    addMessage("[ Microphone active \u2014 speak to Sarah ]", "system");
     log("Web Speech API started");
   } else {
-    addBubble(txYou, "[ Mic transcription unavailable in this browser — type below ]", "system");
-    log("SpeechRecognition not available — text input fallback");
-    // Show a simple text input fallback
-    const inp = document.createElement("input");
-    inp.type = "text"; inp.placeholder = "Type your reply and press Enter…";
-    inp.style.cssText = "width:100%;background:#1a2035;border:1px solid #2d3148;color:#e2e8f0;padding:8px 12px;border-radius:6px;font-size:0.85rem;margin-top:8px;";
-    inp.onkeydown = (e) => {
-      if (e.key === "Enter" && inp.value.trim() && mockWs && mockWs.readyState === WebSocket.OPEN) {
-        mockWs.send(JSON.stringify({type: "user_speech", text: inp.value.trim()}));
-        inp.value = "";
+    addMessage("[ Type your reply below and press Enter ]", "system");
+    log("SpeechRecognition unavailable \u2014 showing text input");
+    textInputRow.style.display = "block"; textInput.focus();
+    textInput.onkeydown = (e) => {
+      if (e.key === "Enter" && textInput.value.trim() && mockWs && mockWs.readyState === WebSocket.OPEN) {
+        mockWs.send(JSON.stringify({ type: "user_speech", text: textInput.value.trim() }));
+        textInput.value = "";
       }
     };
-    document.querySelector(".transcript-col.you").appendChild(inp);
   }
+}
+
+function _populateVoiceList() {
+  if (!("speechSynthesis" in window)) return;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return;
+  _ttsVoicesReady = true;
+  const engVoices = voices.filter(v => /en[-_]/i.test(v.lang));
+  const prev = voiceSelect.value;
+  voiceSelect.innerHTML = "";
+  engVoices.forEach(v => {
+    const opt = document.createElement("option");
+    opt.value = v.name;
+    opt.textContent = v.name.replace(/Microsoft|Online|Natural/gi, "").trim();
+    if (prev ? v.name === prev : /aria/i.test(v.name)) opt.selected = true;
+    voiceSelect.appendChild(opt);
+  });
+  if (!voiceSelect.value && voiceSelect.options.length) voiceSelect.options[0].selected = true;
+}
+if ("speechSynthesis" in window) {
+  _populateVoiceList();
+  window.speechSynthesis.onvoiceschanged = _populateVoiceList;
 }
 
 function speakSarah(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
-  const utt = new SpeechSynthesisUtterance(text);
-  utt.rate = 1.05; utt.pitch = 1.1;
-  // Pick a female voice if available
-  const voices = window.speechSynthesis.getVoices();
-  const female = voices.find(v => /female|woman|zira|hazel|aria|natasha/i.test(v.name));
-  if (female) utt.voice = female;
-  window.speechSynthesis.speak(utt);
+  const _doSpeak = () => {
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.rate = 0.95; utt.pitch = 1.0; utt.volume = 1.0;
+    const allVoices = window.speechSynthesis.getVoices();
+    const sel = voiceSelect && voiceSelect.value;
+    const pick =
+      (sel && allVoices.find(v => v.name === sel)) ||
+      allVoices.find(v => /microsoft.*aria/i.test(v.name))     ||
+      allVoices.find(v => /microsoft.*jenny/i.test(v.name))    ||
+      allVoices.find(v => /microsoft.*michelle/i.test(v.name)) ||
+      allVoices.find(v => /microsoft.*zira/i.test(v.name))     ||
+      allVoices.find(v => /en[-_]?(us|gb|au)/i.test(v.lang) && v.name);
+    if (pick) utt.voice = pick;
+    utt.onerror = (e) => console.warn("TTS error:", e.error);
+    window.speechSynthesis.speak(utt);
+  };
+  if (_ttsVoicesReady || window.speechSynthesis.getVoices().length > 0) setTimeout(_doSpeak, 50);
+  else window.speechSynthesis.onvoiceschanged = () => { _populateVoiceList(); setTimeout(_doSpeak, 50); };
+}
+
+function setCallActive(active) {
+  if (active) {
+    btnCall.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Hang Up`;
+    btnCall.className = "btn-call active"; btnCall.disabled = false; avatarRing.classList.add("active");
+  } else {
+    btnCall.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.28 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.94-.94a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.66 16l.26.92z"/></svg> Call Sarah`;
+    btnCall.className = "btn-call idle"; btnCall.disabled = false; avatarRing.classList.remove("active");
+  }
 }
 
 async function hangUp() {
   btnCall.disabled = true;
-  log("Hanging up…");
+  log("Hanging up\u2026");
+  _stopTTSWatchdog();
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   if (mockWs)  { mockWs.close(); mockWs = null; }
   if (mockRecognition) { try { mockRecognition.stop(); } catch(_){} mockRecognition = null; }
   if (room) { await room.disconnect(); room = null; }
+  textInputRow.style.display = "none";
 }
 
 function onCallEnded() {
-  setStatus("Call ended.");
-  btnCall.textContent = "📞 Call Sarah";
-  btnCall.className   = "btn-call idle";
-  btnCall.disabled    = false;
-  avatarEl.classList.remove("speaking");
-  stopMeters();
-  addBubble(txYou,   "[ Call ended ]", "system");
-  addBubble(txSarah, "[ Call ended ]", "system");
+  setStatus("Call ended"); setStatusSub("");
+  setCallActive(false); stopMeters();
+  addMessage("[ Call ended ]", "system");
 }
-
 function setStatus(text, cls) {
   statusEl.textContent = text;
-  statusEl.className = "status-text" + (cls ? " " + cls : "");
+  statusEl.className = "call-status-text" + (cls ? " " + cls : "");
 }
+function setStatusSub(text) { statusSub.textContent = text; }
 
 })();
 </script>
+</body>
+</html>
