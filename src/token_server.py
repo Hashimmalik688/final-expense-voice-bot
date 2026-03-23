@@ -58,26 +58,88 @@ TTS_SERVER_URL = os.environ.get("TTS_SERVER_URL", "http://127.0.0.1:8002")
 # echo-style Sarah persona over WebSocket so the browser UI shows green.
 MOCK_MODE = os.environ.get("MOCK_MODE", "false").lower() == "true"
 
-# Scripted opening + fallback replies used in mock mode
+# Scripted opening + keyword-aware replies used in mock mode
 _MOCK_OPENING = (
     "Hi, this is Sarah with American Beneficiary — "
     "I'm calling about the final expense coverage inquiry we received. "
     "Did I catch you at an okay time?"
 )
-_MOCK_REPLIES = [
-    "That's great to hear. Just to confirm I have you in the right area — "
+
+# Keyword rules: list of (pattern, reply).  First match wins.
+# Checked against the lower-cased user reply.
+_MOCK_KEYWORD_RULES = [
+    # Bad time / busy / not interested
+    (r"\b(no|not now|bad time|busy|not interested|wrong|didn.t|did not|dont|don.t)\b",
+     "Oh I'm sorry to catch you at a bad time! I totally understand — "
+     "this will only take about 60 seconds. "
+     "We received an inquiry about final expense coverage for your household. "
+     "Is there a better time I can reach you today?"),
+    # Hung up / goodbye
+    (r"\b(bye|goodbye|hang up|stop calling|remove|do not call)\b",
+     "Absolutely, I'll note that. You're welcome to call us back at any time "
+     "if you change your mind. Have a wonderful day!"),
+    # Age too young
+    (r"\b(1[0-9]|2[0-9]|3[0-9]|4[0-4])\b",
+     "Oh I see — our program is specifically designed for adults between 45 and 85, "
+     "so it sounds like you may not qualify just yet. "
+     "But I can make a note to follow up when the time is right. "
+     "Is there anyone in your household in that age range?"),
+    # Age in range
+    (r"\b(4[5-9]|[5-7][0-9]|8[0-5])\b",
+     "That's perfect — you're right in our coverage range. "
+     "And are you currently covered under any final expense or burial insurance policy?"),
+    # Yes / good time / sure
+    (r"\b(yes|yeah|yep|sure|okay|ok|go ahead|of course|fine|good|great|absolutely)\b",
+     "Wonderful! Just to confirm — are you between the ages of 45 and 85?"),
+    # Already covered / has insurance
+    (r"\b(covered|have insurance|already have|policy|insured)\b",
+     "That's great to know! Many of our clients find their current coverage "
+     "doesn't fully cover funeral and final expense costs, which can run "
+     "$10,000–$25,000. Would you be open to seeing if we can offer you "
+     "a better rate or supplemental coverage?"),
+    # Not covered / no insurance
+    (r"\b(no|not covered|no insurance|don.t have|nothing)\b",
+     "I understand — that's actually very common. A lot of people in your "
+     "situation find that even a small policy starting as low as $20 a month "
+     "can take a huge burden off their family. "
+     "Can I take just two more minutes to walk you through what's available?"),
+    # How much / cost / price / rate
+    (r"\b(how much|cost|price|rate|afford|cheap|expensive|monthly|premium)\b",
+     "Great question! Coverage typically starts as low as $20 to $30 a month "
+     "depending on your age and health. There's no medical exam required — "
+     "just a few simple questions. Does that sound like something worth looking into?"),
+    # Interested / tell me more
+    (r"\b(tell me more|interested|sounds good|what.s included|what do i get|benefits)\b",
+     "Absolutely! Our plans cover funeral costs, burial, and any outstanding "
+     "medical bills — up to $25,000 in coverage. Premiums are locked in for life "
+     "and the policy builds cash value over time. "
+     "Let me connect you with one of our senior benefit specialists to lock in your rate today."),
+]
+
+# Fallback sequence used when no keyword matches
+_MOCK_FALLBACK_REPLIES = [
+    "I hear you. Just to make sure I have the right info — "
     "are you between the ages of 45 and 85?",
-    "Perfect. And are you currently covered under any final expense or "
-    "burial insurance policy?",
-    "I understand. A lot of people in your situation find that even a small "
-    "policy can take a huge burden off their family. "
+    "Got it. And are you currently covered under any final expense or burial insurance policy?",
+    "I understand. A lot of families in your situation find that even a small "
+    "policy can take a huge burden off their loved ones. "
     "Can I take just two more minutes to walk you through what's available?",
-    "Based on what you've told me it sounds like you could qualify for "
-    "coverage starting as low as $20 a month. Does that sound like "
-    "something worth looking into?",
+    "Based on what you've shared, it sounds like you could qualify for "
+    "coverage starting as low as $20 a month. Does that sound like something worth looking into?",
     "Wonderful — let me connect you with one of our senior benefit "
     "specialists who can lock in your rate today.",
 ]
+
+
+def _pick_mock_reply(user_text: str, fallback_index: int) -> tuple[str, int]:
+    """Return (reply, new_fallback_index) using keyword matching with fallback."""
+    lower = user_text.lower()
+    for pattern, reply in _MOCK_KEYWORD_RULES:
+        if re.search(pattern, lower):
+            return reply, fallback_index
+    # No keyword matched — use next fallback line
+    reply = _MOCK_FALLBACK_REPLIES[fallback_index % len(_MOCK_FALLBACK_REPLIES)]
+    return reply, fallback_index + 1
 
 REPO_ROOT = Path(__file__).parent.parent
 ENV_FILE = REPO_ROOT / ".env"
@@ -384,7 +446,7 @@ async def admin_ws(ws: WebSocket):
 async def mock_room_ws(ws: WebSocket, room: str = "mock"):
     """Simulate a LiveKit Sarah agent over plain WebSocket for Windows dev."""
     await ws.accept()
-    _reply_index = 0
+    _fallback_index = 0
 
     async def _sarah(text: str) -> None:
         await ws.send_json({
@@ -419,9 +481,8 @@ async def mock_room_ws(ws: WebSocket, room: str = "mock"):
                         "speaker": "user",
                         "text": user_text,
                     })
-                await asyncio.sleep(1.2)  # simulate 1-2s thinking
-                reply = _MOCK_REPLIES[_reply_index % len(_MOCK_REPLIES)]
-                _reply_index += 1
+                await asyncio.sleep(1.0)  # simulate thinking delay
+                reply, _fallback_index = _pick_mock_reply(user_text, _fallback_index)
                 await _sarah(reply)
 
             elif msg.get("type") == "ping":
