@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sarah — Final Expense Voice Bot Test</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2d3148;
+    --accent: #4f7ff5;
+    --accent-hover: #3a6ae0;
+    --danger: #e05a5a;
+    --danger-hover: #c94545;
+    --muted: #6b7280;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --green: #22c55e;
+    --yellow: #eab308;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header {
+    width: 100%;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  header h1 { font-size: 1.1rem; font-weight: 600; }
+  header a {
+    font-size: 0.8rem;
+    color: var(--accent);
+    text-decoration: none;
+  }
+  header a:hover { text-decoration: underline; }
+
+  main {
+    width: 100%;
+    max-width: 900px;
+    padding: 32px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* Call control panel */
+  .call-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .avatar {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4f7ff5 0%, #7c5cbf 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem;
+    position: relative;
+  }
+  .avatar.speaking::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50%       { opacity: 1;   transform: scale(1.06); }
+  }
+
+  .status-text {
+    font-size: 1rem;
+    color: var(--text-dim);
+    text-align: center;
+    min-height: 1.4em;
+  }
+  .status-text.connected { color: var(--green); font-weight: 600; }
+  .status-text.error { color: var(--danger); }
+
+  .btn-call {
+    padding: 14px 48px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-call:active { transform: scale(0.97); }
+  .btn-call.idle    { background: var(--accent);  color: #fff; }
+  .btn-call.idle:hover    { background: var(--accent-hover); }
+  .btn-call.active  { background: var(--danger);  color: #fff; }
+  .btn-call.active:hover  { background: var(--danger-hover); }
+  .btn-call:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .meta-row {
+    display: flex;
+    gap: 20px;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .meta-row span { display: flex; align-items: center; gap: 5px; }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  .dot.green  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.yellow { background: var(--yellow);}
+  .dot.red    { background: var(--danger);}
+
+  /* Volume meter */
+  .meter-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 340px;
+  }
+  .meter-label { font-size: 0.75rem; color: var(--muted); width: 28px; }
+  .meter-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .meter-fill {
+    height: 100%;
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.08s ease;
+  }
+  .meter-fill.local  { background: var(--accent); }
+  .meter-fill.remote { background: var(--green); }
+
+  /* Transcript */
+  .transcript-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .transcript-section h2 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .transcript-body {
+    display: flex;
+    gap: 16px;
+    min-height: 200px;
+  }
+  .transcript-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .transcript-col h3 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .transcript-col.you h3 { color: #60a5fa; }
+  .transcript-col.sarah h3 { color: #4ade80; }
+
+  .transcript-scroll {
+    flex: 1;
+    height: 220px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 4px;
+  }
+  .transcript-scroll::-webkit-scrollbar { width: 4px; }
+  .transcript-scroll::-webkit-scrollbar-thumb {
+    background: var(--border); border-radius: 2px;
+  }
+
+  .bubble {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    padding: 8px 12px;
+    border-radius: 8px;
+    max-width: 100%;
+    word-break: break-word;
+  }
+  .bubble.you    { background: #1e3a5f; color: #93c5fd; align-self: flex-start; }
+  .bubble.sarah  { background: #14432a; color: #86efac; align-self: flex-start; }
+  .bubble.system { background: #2d1f00; color: #fbbf24; font-style: italic;
+                   font-size: 0.78rem; }
+
+  /* Debug log */
+  .log-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+  }
+  .log-section summary {
+    font-size: 0.78rem;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .log-pre {
+    margin-top: 12px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    height: 140px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .log-pre::-webkit-scrollbar { width: 4px; }
+  .log-pre::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+
+<body>
+<header>
+  <h1>🎙 Sarah — Voice Bot Test</h1>
+  <a href="/admin">Admin Dashboard →</a>
+</header>
+
+<main>
+  <div class="call-panel">
+    <div class="avatar" id="avatar">🤖</div>
+    <div class="status-text" id="status">Ready to test. Click "Call Sarah" to begin.</div>
+
+    <div class="meta-row">
+      <span><span class="dot" id="dot-lk"></span>LiveKit</span>
+      <span><span class="dot" id="dot-vllm"></span>vLLM</span>
+      <span><span class="dot" id="dot-tts"></span>TTS</span>
+    </div>
+
+    <div class="meter-row">
+      <span class="meter-label">You</span>
+      <div class="meter-bar"><div class="meter-fill local" id="meter-local"></div></div>
+    </div>
+    <div class="meter-row">
+      <span class="meter-label">Sarah</span>
+      <div class="meter-bar"><div class="meter-fill remote" id="meter-remote"></div></div>
+    </div>
+
+    <button class="btn-call idle" id="btn-call">📞 Call Sarah</button>
+  </div>
+
+  <div class="transcript-section">
+    <h2>Transcript</h2>
+    <div class="transcript-body">
+      <div class="transcript-col you">
+        <h3>You</h3>
+        <div class="transcript-scroll" id="tx-you"></div>
+      </div>
+      <div class="transcript-col sarah">
+        <h3>Sarah</h3>
+        <div class="transcript-scroll" id="tx-sarah"></div>
+      </div>
+    </div>
+  </div>
+
+  <details class="log-section">
+    <summary>Debug Log</summary>
+    <pre class="log-pre" id="log-pre"></pre>
+  </details>
+</main>
+
+<!--
+  LiveKit browser client SDK — loaded from jsDelivr CDN.
+  The project uses no paid APIs, so no key needed for this CDN URL.
+-->
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+<script>
+"use strict";
+(async () => {
+
+// ── DOM refs ────────────────────────────────────────────────────────────────
+const statusEl   = document.getElementById("status");
+const avatarEl   = document.getElementById("avatar");
+const btnCall    = document.getElementById("btn-call");
+const txYou      = document.getElementById("tx-you");
+const txSarah    = document.getElementById("tx-sarah");
+const logPre     = document.getElementById("log-pre");
+const meterLocal  = document.getElementById("meter-local");
+const meterRemote = document.getElementById("meter-remote");
+const dotLK      = document.getElementById("dot-lk");
+const dotVLLM    = document.getElementById("dot-vllm");
+const dotTTS     = document.getElementById("dot-tts");
+
+let room = null;
+let audioCtx = null;
+let analyserLocal = null;
+let analyserRemote = null;
+let meterInterval = null;
+
+// ── Logging ─────────────────────────────────────────────────────────────────
+function log(msg) {
+  const ts = new Date().toLocaleTimeString();
+  logPre.textContent += `[${ts}] ${msg}\n`;
+  logPre.scrollTop = logPre.scrollHeight;
+  console.log(msg);
+}
+
+// ── Health check ─────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch("/health");
+    const d = await r.json();
+    dotLK.className   = "dot " + (d.livekit === "ok" ? "green" : "red");
+    dotVLLM.className = "dot " + (d.vllm    === "ok" ? "green" : (d.vllm === "degraded" ? "yellow" : "red"));
+    dotTTS.className  = "dot " + (d.tts     === "ok" ? "green" : (d.tts  === "degraded" ? "yellow" : "red"));
+    log(`Health: livekit=${d.livekit} vllm=${d.vllm} tts=${d.tts}`);
+  } catch(e) {
+    log("Health check failed: " + e.message);
+  }
+}
+checkHealth();
+setInterval(checkHealth, 30000);
+
+// ── Transcript helpers ────────────────────────────────────────────────────────
+function addBubble(container, text, cls) {
+  const div = document.createElement("div");
+  div.className = `bubble ${cls}`;
+  div.textContent = text;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+// ── Volume meter ──────────────────────────────────────────────────────────────
+function startMeters(localStream, remoteStream) {
+  audioCtx = new AudioContext();
+
+  function makeAnalyser(stream) {
+    if (!stream) return null;
+    const src = audioCtx.createMediaStreamSource(stream);
+    const an  = audioCtx.createAnalyser();
+    an.fftSize = 512;
+    src.connect(an);
+    return an;
+  }
+
+  analyserLocal  = makeAnalyser(localStream);
+  analyserRemote = makeAnalyser(remoteStream);
+
+  const buf = new Uint8Array(128);
+  meterInterval = setInterval(() => {
+    const rms = (an) => {
+      if (!an) return 0;
+      an.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = (buf[i] - 128) / 128;
+        sum += v * v;
+      }
+      return Math.min(1, Math.sqrt(sum / buf.length) * 6);
+    };
+    meterLocal.style.width  = (rms(analyserLocal)  * 100) + "%";
+    meterRemote.style.width = (rms(analyserRemote) * 100) + "%";
+  }, 80);
+}
+
+function stopMeters() {
+  if (meterInterval) { clearInterval(meterInterval); meterInterval = null; }
+  meterLocal.style.width  = "0%";
+  meterRemote.style.width = "0%";
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  analyserLocal = analyserRemote = null;
+}
+
+// ── Call control ──────────────────────────────────────────────────────────────
+btnCall.addEventListener("click", async () => {
+  if (room && room.state === "connected") {
+    await hangUp();
+  } else {
+    await startCall();
+  }
+});
+
+async function startCall() {
+  btnCall.disabled = true;
+  setStatus("Requesting microphone…");
+  log("Requesting mic permission…");
+
+  let localStream;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch (e) {
+    setStatus("Mic access denied. Please allow microphone.", "error");
+    log("Mic error: " + e.message);
+    btnCall.disabled = false;
+    return;
+  }
+
+  setStatus("Fetching LiveKit token…");
+  log("Fetching token…");
+
+  let tokenData;
+  try {
+    const r = await fetch("/token");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    tokenData = await r.json();
+  } catch (e) {
+    setStatus("Token error: " + e.message, "error");
+    log("Token error: " + e.message);
+    btnCall.disabled = false;
+    return;
+  }
+
+  log(`Room: ${tokenData.room}  LK: ${tokenData.url}`);
+  setStatus("Connecting to LiveKit…");
+
+  // Use the global LiveKitClient from the bundled UMD script
+  const LK = window.LivekitClient;
+  room = new LK.Room({
+    adaptiveStream: false,
+    dynacast: false,
+  });
+
+  // ── Room event handlers ───────────────────────────────────────────────────
+
+  room.on(LK.RoomEvent.Connected, () => {
+    log("Room connected ✓");
+    setStatus(`Connected — Room: ${tokenData.room}`, "connected");
+    btnCall.textContent = "📵 Hang Up";
+    btnCall.className   = "btn-call active";
+    btnCall.disabled    = false;
+    avatarEl.classList.add("speaking");
+  });
+
+  room.on(LK.RoomEvent.Disconnected, () => {
+    log("Room disconnected");
+    onCallEnded();
+  });
+
+  room.on(LK.RoomEvent.TrackSubscribed, (track, pub, participant) => {
+    log(`Track subscribed: ${track.kind} from ${participant.identity}`);
+    if (track.kind === LK.Track.Kind.Audio) {
+      const el = track.attach();
+      el.style.display = "none";
+      document.body.appendChild(el);
+      addBubble(txSarah, "[ Sarah joined the call ]", "system");
+
+      // Wire Sarah's audio to remote meter
+      if (el.srcObject) {
+        startMeters(localStream, el.srcObject);
+      }
+    }
+  });
+
+  room.on(LK.RoomEvent.TrackUnsubscribed, (track) => {
+    track.detach();
+  });
+
+  room.on(LK.RoomEvent.DataReceived, (payload, participant) => {
+    try {
+      const msg = JSON.parse(new TextDecoder().decode(payload));
+      if (msg.type === "transcript") {
+        if (msg.speaker === "user") {
+          addBubble(txYou,   msg.text, "you");
+        } else {
+          addBubble(txSarah, msg.text, "sarah");
+        }
+      }
+    } catch (_) {}
+  });
+
+  room.on(LK.RoomEvent.ParticipantConnected, (p) => {
+    log(`Participant joined: ${p.identity}`);
+    addBubble(txSarah, `[ ${p.identity} connected ]`, "system");
+  });
+
+  room.on(LK.RoomEvent.ParticipantDisconnected, (p) => {
+    log(`Participant left: ${p.identity}`);
+    addBubble(txSarah, `[ ${p.identity} disconnected ]`, "system");
+  });
+
+  // ── Connect & publish mic ─────────────────────────────────────────────────
+  try {
+    await room.connect(tokenData.url, tokenData.token);
+  } catch (e) {
+    setStatus("Connection failed: " + e.message, "error");
+    log("Connect error: " + e.message);
+    btnCall.className = "btn-call idle";
+    btnCall.textContent = "📞 Call Sarah";
+    btnCall.disabled = false;
+    return;
+  }
+
+  try {
+    await room.localParticipant.setMicrophoneEnabled(true);
+    log("Microphone published ✓");
+    startMeters(localStream, null);
+    addBubble(txYou, "[ Microphone active ]", "system");
+  } catch (e) {
+    log("Publish mic error: " + e.message);
+  }
+}
+
+async function hangUp() {
+  btnCall.disabled = true;
+  log("Hanging up…");
+  if (room) {
+    await room.disconnect();
+    room = null;
+  }
+}
+
+function onCallEnded() {
+  setStatus("Call ended.");
+  btnCall.textContent = "📞 Call Sarah";
+  btnCall.className   = "btn-call idle";
+  btnCall.disabled    = false;
+  avatarEl.classList.remove("speaking");
+  stopMeters();
+  addBubble(txYou,   "[ Call ended ]", "system");
+  addBubble(txSarah, "[ Call ended ]", "system");
+}
+
+function setStatus(text, cls) {
+  statusEl.textContent = text;
+  statusEl.className = "status-text" + (cls ? " " + cls : "");
+}
+
+})();
+</script>
+</body>
+</html>

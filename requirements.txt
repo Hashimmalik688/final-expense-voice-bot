@@ -12,7 +12,7 @@
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 aiohttp>=3.10.11    # CVE-2024-52304 fixed in 3.10.11 (RHDA)
-pyVoIP>=1.6.8
+python-multipart>=0.0.9   # required by FastAPI for form/file uploads
 
 # --- Configuration ---
 python-dotenv>=1.0.0
@@ -31,17 +31,29 @@ soundfile>=0.12.0
 # --- Semantic search / RAG embedding ---
 sentence-transformers>=2.7.0
 
-# --- Voice Activity Detection (adopted from ShayneP/local-voice-ai) ---
+# --- Voice Activity Detection ---
 silero-vad>=5.1.2
 
-# --- TTS (Kokoro v0.9 text-to-speech engine) ---
-kokoro>=0.9.0
+# --- LiveKit server SDK + agents framework ---
+livekit>=0.11.0
+livekit-api>=0.7.0
+livekit-agents>=0.10.0
+livekit-plugins-silero>=0.10.0   # silero VAD via agents plugin
 
-# --- NeMo ASR (Parakeet TDT speech-to-text) —REQUIRED for STT —
+# --- NeMo ASR (Parakeet TDT speech-to-text) —REQUIRED for STT ---
 nemo_toolkit[asr]>=2.1.0
 
-# --- PyTorch (CUDA 12.1) —— REQUIRED for LLM, STT, TTS inference ---
-# Note: Installed separately via deploy script with CUDA index for perf
+# --- TTS (Qwen3-TTS primary, XTTS2 fallback, Kokoro last resort) ---
+# Qwen3-TTS uses transformers + torchaudio (already in PyTorch install)
+transformers>=4.46.0
+# XTTS2 fallback:
+TTS>=0.22.0
+# Kokoro last-resort fallback:
+kokoro>=0.9.0
+
+# --- PyTorch (CUDA 12.1) — REQUIRED for LLM, STT, TTS inference ---
+# Note: Install separately with CUDA index for best performance:
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
 # torch>=2.5.0
 # torchaudio>=2.5.0
 

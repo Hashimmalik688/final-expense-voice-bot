@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sarah — Admin Dashboard</title>
+<style>
+  :root {
+    --bg: #0d0f1a;
+    --surface: #161929;
+    --surface2: #1e2133;
+    --border: #2d3352;
+    --accent: #4f7ff5;
+    --accent2: #7c5cbf;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #e05a5a;
+    --muted: #6b7280;
+    --text: #e2e8f0;
+    --text-dim: #8892a4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 0.88rem;
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* Sidebar */
+  nav {
+    width: 220px;
+    min-width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 20px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  nav .brand {
+    padding: 0 20px 20px;
+    font-size: 1rem;
+    font-weight: 700;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  nav .brand span { color: var(--accent); }
+  nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    color: var(--text-dim);
+    text-decoration: none;
+    border-radius: 0 6px 6px 0;
+    margin: 2px 8px 2px 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  nav a:hover, nav a.active {
+    background: var(--surface2);
+    color: var(--text);
+  }
+  nav .sep { height: 1px; background: var(--border); margin: 12px 20px; }
+  nav .back-link {
+    margin-top: auto;
+    padding: 12px 20px 4px;
+    border-top: 1px solid var(--border);
+  }
+  nav .back-link a { color: var(--accent); font-size: 0.8rem; }
+
+  /* Main content */
+  main {
+    flex: 1;
+    padding: 28px;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .page-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .page-sub { color: var(--text-dim); font-size: 0.8rem; }
+
+  /* Section wrapper */
+  section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 24px;
+  }
+  section h2 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Status cards */
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+  .status-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .status-card .sc-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .status-card .sc-value { font-size: 1.15rem; font-weight: 700; }
+  .sc-value.ok     { color: var(--green); }
+  .sc-value.degraded, .sc-value.warn { color: var(--yellow); }
+  .sc-value.err, .sc-value.error  { color: var(--red); }
+
+  /* Calls table */
+  .calls-table { width: 100%; border-collapse: collapse; }
+  .calls-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .calls-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.82rem;
+    color: var(--text-dim);
+  }
+  .calls-table tr:last-child td { border-bottom: none; }
+  .calls-table tr:hover td { background: var(--surface2); color: var(--text); }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+  .badge.green  { background: #052e16; color: var(--green); }
+  .badge.yellow { background: #2d1f00; color: var(--yellow); }
+  .badge.red    { background: #2b0d0d; color: var(--red); }
+  .badge.blue   { background: #0e1a35; color: #60a5fa; }
+  .no-data { color: var(--muted); font-style: italic; padding: 16px 0; text-align: center; }
+
+  /* Bots / tuning controls */
+  .controls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 700px) { .controls-grid { grid-template-columns: 1fr; } }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 0.78rem; color: var(--text-dim); }
+  .form-group input[type=number], .form-group input[type=range] {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    width: 100%;
+  }
+  input[type=range] { padding: 6px 0; cursor: pointer; }
+  .range-row { display: flex; align-items: center; gap: 10px; }
+  .range-row input { flex: 1; }
+  .range-val { width: 40px; text-align: right; color: var(--accent); font-weight: 600; }
+  .btn {
+    padding: 9px 22px;
+    border-radius: 7px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary  { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled)  { background: #3a6ae0; }
+  .btn-danger   { background: var(--red);    color: #fff; }
+  .btn-danger:hover:not(:disabled)   { background: #c94545; }
+  .btn-ghost    { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover:not(:disabled)    { background: var(--border); }
+  .save-row { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+  .save-msg { font-size: 0.78rem; color: var(--green); }
+
+  /* Script editor */
+  textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: #93c5fd;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.78rem;
+    border-radius: 8px;
+    padding: 14px;
+    min-height: 320px;
+    resize: vertical;
+    line-height: 1.6;
+  }
+  textarea:focus { outline: 1px solid var(--accent); }
+
+  /* Live log */
+  .log-container {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    height: 280px;
+    overflow-y: auto;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    color: #94a3b8;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .log-container::-webkit-scrollbar { width: 4px; }
+  .log-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .log-line.err  { color: #f87171; }
+  .log-line.warn { color: #fbbf24; }
+  .log-line.info { color: #94a3b8; }
+
+  /* Notification toast */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 0.85rem;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    max-width: 320px;
+  }
+  #toast.show { opacity: 1; }
+  #toast.success { border-left: 3px solid var(--green); }
+  #toast.error   { border-left: 3px solid var(--red); }
+</style>
+</head>
+
+<body>
+
+<nav>
+  <div class="brand">🤖 <span>Sarah</span> Admin</div>
+  <a href="#status"  class="active">📊 System Status</a>
+  <a href="#calls">  📞 Call History</a>
+  <a href="#bots">   🤖 Bot Scaling</a>
+  <a href="#script"> 📝 Script Editor</a>
+  <a href="#tuning"> 🎛 Tuning</a>
+  <a href="#logs">   📋 Live Logs</a>
+  <div class="sep"></div>
+  <div class="back-link"><a href="/">← Test UI</a></div>
+</nav>
+
+<main>
+  <div>
+    <div class="page-title">Admin Dashboard</div>
+    <div class="page-sub" id="ws-state">WebSocket: connecting…</div>
+  </div>
+
+  <!-- 1. System Status -->
+  <section id="status">
+    <h2>System Status</h2>
+    <div class="status-grid">
+      <div class="status-card">
+        <div class="sc-label">LiveKit</div>
+        <div class="sc-value" id="s-livekit">—</div>
+      </div>
+      <div class="status-card">
+        <div class="sc-label">vLLM</div>
+        <div class="sc-value" id="s-vllm">—</div>
+      </div>
+      <div class="status-card">
+        <div class="sc-label">TTS Server</div>
+        <div class="sc-value" id="s-tts">—</div>
+      </div>
+      <div class="status-card">
+        <div class="sc-label">Active Calls</div>
+        <div class="sc-value" id="s-active">0</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Call History -->
+  <section id="calls">
+    <h2>Call History <button class="btn btn-ghost" id="btn-refresh-calls" style="float:right;padding:4px 12px;font-size:0.75rem;">↻ Refresh</button></h2>
+    <div id="calls-body">
+      <div class="no-data">Loading calls…</div>
+    </div>
+  </section>
+
+  <!-- 3. Bot Scaling -->
+  <section id="bots">
+    <h2>Bot Scaling</h2>
+    <div class="controls-grid">
+      <div class="form-group">
+        <label for="inp-maxbots">Max Concurrent Bots (MAX_BOTS in .env)</label>
+        <input type="number" id="inp-maxbots" min="1" max="50" value="1"/>
+      </div>
+    </div>
+    <div class="save-row">
+      <button class="btn btn-primary" id="btn-save-bots">Save MAX_BOTS</button>
+      <span class="save-msg" id="msg-bots"></span>
+    </div>
+    <p style="margin-top:12px; color:var(--muted); font-size:0.78rem;">
+      ⚠ Takes effect after restarting agent workers (run <code>./stop.sh &amp;&amp; ./start.sh</code>).
+    </p>
+  </section>
+
+  <!-- 4. Script Editor -->
+  <section id="script">
+    <h2>Sales Script Editor (config/sales_script.yaml)</h2>
+    <textarea id="script-editor" spellcheck="false" placeholder="Loading script…"></textarea>
+    <div class="save-row">
+      <button class="btn btn-primary" id="btn-save-script">Save Script</button>
+      <button class="btn btn-ghost"   id="btn-reload-script">↻ Reload</button>
+      <span class="save-msg" id="msg-script"></span>
+    </div>
+  </section>
+
+  <!-- 5. Tuning Controls -->
+  <section id="tuning">
+    <h2>Tuning Controls</h2>
+    <div class="controls-grid">
+      <div class="form-group">
+        <label>VAD Threshold <small style="color:var(--muted)">(higher = less sensitive)</small></label>
+        <div class="range-row">
+          <input type="range" id="inp-vad" min="0.1" max="0.9" step="0.05" value="0.5"/>
+          <span class="range-val" id="val-vad">0.50</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Confidence Threshold <small style="color:var(--muted)">(STT min confidence)</small></label>
+        <div class="range-row">
+          <input type="range" id="inp-conf" min="0.0" max="1.0" step="0.05" value="0.5"/>
+          <span class="range-val" id="val-conf">0.50</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Min Endpointing Delay (s) <small style="color:var(--muted)">(pause before Sarah responds)</small></label>
+        <div class="range-row">
+          <input type="range" id="inp-endpt" min="0.3" max="3.0" step="0.1" value="1.0"/>
+          <span class="range-val" id="val-endpt">1.0</span>
+        </div>
+      </div>
+    </div>
+    <div class="save-row">
+      <button class="btn btn-primary" id="btn-save-tuning">Save Tuning</button>
+      <span class="save-msg" id="msg-tuning"></span>
+    </div>
+    <p style="margin-top:12px; color:var(--muted); font-size:0.78rem;">
+      ⚠ Changes take effect on the NEXT call (next AgentSession creation).
+    </p>
+  </section>
+
+  <!-- 6. Live Logs -->
+  <section id="logs">
+    <h2>
+      Live Logs
+      <button class="btn btn-ghost" id="btn-clear-log" style="float:right;padding:4px 12px;font-size:0.75rem;">Clear</button>
+      <button class="btn btn-ghost" id="btn-load-log"  style="float:right;margin-right:8px;padding:4px 12px;font-size:0.75rem;">Load File</button>
+    </h2>
+    <div class="log-container" id="log-container"></div>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+(async () => {
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+const toast = document.getElementById("toast");
+function showToast(msg, type="success") {
+  toast.textContent = msg;
+  toast.className = "show " + type;
+  setTimeout(() => { toast.className = ""; }, 3000);
+}
+
+// ── WebSocket to /admin/ws ────────────────────────────────────────────────────
+let ws;
+const wsState = document.getElementById("ws-state");
+
+function connectWS() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/admin/ws`);
+
+  ws.onopen = () => {
+    wsState.textContent = "WebSocket: connected ✓";
+    wsState.style.color = "var(--green)";
+  };
+  ws.onclose = () => {
+    wsState.textContent = "WebSocket: disconnected — retrying…";
+    wsState.style.color = "var(--yellow)";
+    setTimeout(connectWS, 4000);
+  };
+  ws.onerror = () => {
+    wsState.textContent = "WebSocket: error";
+    wsState.style.color = "var(--red)";
+  };
+  ws.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      handleWsMsg(msg);
+    } catch(_) {}
+  };
+}
+
+function handleWsMsg(msg) {
+  if (msg.type === "status") {
+    applyStatus(msg.data);
+  } else if (msg.type === "log") {
+    appendLog(msg.text, msg.level);
+  } else if (msg.type === "call_event") {
+    appendLog(`[CALL ${msg.call_id}] ${msg.event}`, "info");
+    s_active.textContent = msg.active_calls ?? "?";
+  } else if (msg.type === "script_reload") {
+    showToast("Script updated", "success");
+    loadScript();
+  }
+}
+
+connectWS();
+
+// ── Status ────────────────────────────────────────────────────────────────────
+const s_livekit = document.getElementById("s-livekit");
+const s_vllm    = document.getElementById("s-vllm");
+const s_tts     = document.getElementById("s-tts");
+const s_active  = document.getElementById("s-active");
+
+function applyStatus(d) {
+  const set = (el, v) => {
+    el.textContent = v;
+    el.className = "sc-value " + (v === "ok" ? "ok" : v === "degraded" ? "degraded" : "err");
+  };
+  set(s_livekit, d.livekit || "—");
+  set(s_vllm,    d.vllm    || "—");
+  set(s_tts,     d.tts     || "—");
+}
+
+async function loadStatus() {
+  try {
+    const r = await fetch("/admin/status");
+    applyStatus(await r.json());
+  } catch(_) {}
+}
+loadStatus();
+setInterval(loadStatus, 20000);
+
+// ── Calls ─────────────────────────────────────────────────────────────────────
+const callsBody = document.getElementById("calls-body");
+
+function renderCallsTable(calls) {
+  if (!calls.length) {
+    callsBody.innerHTML = '<div class="no-data">No calls found in logs/calls/</div>';
+    return;
+  }
+  let html = `<table class="calls-table">
+    <thead><tr>
+      <th>Call ID</th><th>Started</th><th>Duration</th>
+      <th>Turns</th><th>Stage</th><th>Outcome</th>
+    </tr></thead><tbody>`;
+  for (const c of calls) {
+    const dur  = c.duration_s != null ? c.duration_s + "s" : "—";
+    const started = c.started_at ? new Date(c.started_at * 1000).toLocaleString() : "—";
+    const badge = badgeForOutcome(c.outcome);
+    const stageBadge = c.stage ? `<span class="badge blue">${c.stage}</span>` : "—";
+    html += `<tr>
+      <td><code>${c.call_id.slice(0,16)}</code></td>
+      <td>${started}</td>
+      <td>${dur}</td>
+      <td>${c.turns ?? 0}</td>
+      <td>${stageBadge}</td>
+      <td>${badge}</td>
+    </tr>`;
+  }
+  html += "</tbody></table>";
+  callsBody.innerHTML = html;
+}
+
+function badgeForOutcome(outcome) {
+  if (!outcome || outcome === "in_progress") return `<span class="badge yellow">in_progress</span>`;
+  if (outcome === "sale" || outcome === "booked") return `<span class="badge green">${outcome}</span>`;
+  if (outcome === "dnc" || outcome === "voicemail") return `<span class="badge red">${outcome}</span>`;
+  return `<span class="badge blue">${outcome}</span>`;
+}
+
+async function loadCalls() {
+  try {
+    const r = await fetch("/admin/calls");
+    const d = await r.json();
+    renderCallsTable(d.calls || []);
+    s_active.textContent = (d.calls || []).filter(c => c.outcome === "in_progress").length;
+  } catch(e) {
+    callsBody.innerHTML = `<div class="no-data" style="color:var(--red)">Error loading calls: ${e.message}</div>`;
+  }
+}
+loadCalls();
+document.getElementById("btn-refresh-calls").onclick = loadCalls;
+
+// ── Bot scaling ───────────────────────────────────────────────────────────────
+document.getElementById("btn-save-bots").onclick = async () => {
+  const v = parseInt(document.getElementById("inp-maxbots").value, 10);
+  if (!v || v < 1) { showToast("Invalid value", "error"); return; }
+  try {
+    const r = await fetch("/admin/bots", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({max_bots: v}),
+    });
+    const d = await r.json();
+    document.getElementById("msg-bots").textContent = d.note || "Saved";
+    showToast("MAX_BOTS saved", "success");
+  } catch(e) { showToast("Error: " + e.message, "error"); }
+};
+
+// ── Script editor ─────────────────────────────────────────────────────────────
+const scriptEditor = document.getElementById("script-editor");
+const msgScript    = document.getElementById("msg-script");
+
+async function loadScript() {
+  try {
+    const r = await fetch("/admin/script");
+    if (!r.ok) { scriptEditor.placeholder = "sales_script.yaml not found"; return; }
+    const d = await r.json();
+    scriptEditor.value = d.content;
+    msgScript.textContent = "";
+  } catch(e) {
+    scriptEditor.placeholder = "Error loading script: " + e.message;
+  }
+}
+loadScript();
+document.getElementById("btn-reload-script").onclick = loadScript;
+
+document.getElementById("btn-save-script").onclick = async () => {
+  const content = scriptEditor.value;
+  if (!content.trim()) { showToast("Script is empty", "error"); return; }
+  try {
+    const r = await fetch("/admin/script", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({content}),
+    });
+    const d = await r.json();
+    if (r.ok) {
+      msgScript.textContent = "✓ Saved";
+      showToast("Script saved", "success");
+    } else {
+      msgScript.textContent = d.detail || "Error";
+      showToast(d.detail || "Error", "error");
+    }
+  } catch(e) { showToast("Error: " + e.message, "error"); }
+};
+
+// ── Tuning ────────────────────────────────────────────────────────────────────
+function bindRange(id, displayId, decimals=2) {
+  const inp = document.getElementById(id);
+  const val = document.getElementById(displayId);
+  inp.addEventListener("input", () => { val.textContent = parseFloat(inp.value).toFixed(decimals); });
+}
+bindRange("inp-vad",   "val-vad",   2);
+bindRange("inp-conf",  "val-conf",  2);
+bindRange("inp-endpt", "val-endpt", 1);
+
+document.getElementById("btn-save-tuning").onclick = async () => {
+  const payload = {
+    vad_threshold:         parseFloat(document.getElementById("inp-vad").value),
+    confidence_threshold:  parseFloat(document.getElementById("inp-conf").value),
+    min_endpointing_delay: parseFloat(document.getElementById("inp-endpt").value),
+  };
+  try {
+    const r = await fetch("/admin/settings", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload),
+    });
+    const d = await r.json();
+    if (r.ok) {
+      document.getElementById("msg-tuning").textContent = "✓ Saved — " + (d.note || "");
+      showToast("Tuning saved", "success");
+    } else {
+      showToast(d.detail || "Error", "error");
+    }
+  } catch(e) { showToast("Error: " + e.message, "error"); }
+};
+
+// ── Live Logs ─────────────────────────────────────────────────────────────────
+const logContainer = document.getElementById("log-container");
+
+function appendLog(text, level="info") {
+  const div = document.createElement("div");
+  div.className = "log-line " + (level || "info");
+  div.textContent = text;
+  logContainer.appendChild(div);
+  logContainer.scrollTop = logContainer.scrollHeight;
+  // Cap at 500 lines to prevent memory growth
+  while (logContainer.children.length > 500) {
+    logContainer.removeChild(logContainer.firstChild);
+  }
+}
+
+async function loadLogFile() {
+  try {
+    const r = await fetch("/admin/logs?lines=200");
+    const d = await r.json();
+    logContainer.innerHTML = "";
+    for (const line of (d.lines || [])) {
+      const level = line.includes("ERROR") ? "err"
+                  : line.includes("WARN")  ? "warn"
+                  : "info";
+      appendLog(line, level);
+    }
+  } catch(e) {
+    appendLog("Error loading logs: " + e.message, "err");
+  }
+}
+loadLogFile();
+
+document.getElementById("btn-load-log").onclick  = loadLogFile;
+document.getElementById("btn-clear-log").onclick = () => { logContainer.innerHTML = ""; };
+
+// Auto-refresh log every 30s
+setInterval(loadLogFile, 30000);
+
+// ── Smooth scroll nav ─────────────────────────────────────────────────────────
+document.querySelectorAll("nav a[href^='#']").forEach(a => {
+  a.addEventListener("click", e => {
+    e.preventDefault();
+    document.querySelectorAll("nav a").forEach(x => x.classList.remove("active"));
+    a.classList.add("active");
+    const target = document.querySelector(a.getAttribute("href"));
+    if (target) target.scrollIntoView({behavior:"smooth"});
+  });
+});
+
+})();
+</script>
+</body>
+</html>
